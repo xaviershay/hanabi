@@ -1,0 +1,95 @@
+-- This file has been generated from package.yaml by hpack version 0.28.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: b2c07a5096500e64f268f31cb11d476c1ce67611aefd0f67b3bc1ab91acd553f
+
+name:           hanabi
+version:        0.1.0.0
+description:    Hanabi clone
+homepage:       https://github.com/xaviershay/hanabi#readme
+bug-reports:    https://github.com/xaviershay/hanabi/issues
+author:         Xavier Shay
+maintainer:     contact@xaviershay.com
+copyright:      2018 Xavier Shay
+license:        BSD3
+build-type:     Simple
+cabal-version:  >= 1.10
+
+source-repository head
+  type: git
+  location: https://github.com/xaviershay/hanabi
+
+library
+  exposed-modules:
+      Hanabi
+      Hanabi.Api
+      Hanabi.Types
+  other-modules:
+      Paths_hanabi
+  hs-source-dirs:
+      src
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , hashable
+    , lens
+    , mtl
+    , parsec
+    , pretty-show
+    , random
+    , servant-server
+    , stm
+    , text
+    , time
+    , transformers
+    , unordered-containers
+    , wai-cors
+    , wai-extra
+  default-language: Haskell2010
+
+executable hanabi-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_hanabi
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , hanabi
+    , pretty-show
+    , servant-server
+    , text
+    , wai
+    , warp
+  default-language: Haskell2010
+
+test-suite hanabi-test
+  type: exitcode-stdio-1.0
+  main-is: Driver.hs
+  other-modules:
+      Paths_hanabi
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wunused-imports
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , containers
+    , hanabi
+    , hashable
+    , lens
+    , mtl
+    , random
+    , random-shuffle
+    , tasty
+    , tasty-discover
+    , tasty-hunit
+    , tasty-quickcheck
+    , text
+    , unordered-containers
+  default-language: Haskell2010
