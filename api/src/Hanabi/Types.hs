@@ -1,6 +1,25 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module Hanabi.Types where
 
-type State = ()
+import GHC.Generics
 
-mkState :: IO State
-mkState = return ()
+import           Control.Lens
+import           Data.Time.Clock     (UTCTime)
+import Data.Aeson
+
+data Game = Game
+  { _gameVersion :: Integer
+  , _gameModified :: UTCTime
+  } deriving (Generic)
+
+makeLenses ''Game
+
+mkGame :: UTCTime -> Game
+mkGame now = Game
+  { _gameVersion = 1
+  , _gameModified = now
+  }
+
+instance ToJSON Game

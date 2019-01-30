@@ -7,11 +7,18 @@ class App extends Component {
   }
 
   componentDidMount() {
-    fetch('http://localhost:8080/_status')
-      .then(results => results.json())
-      .then(data => {
-        console.log(data)
-      })
+    let version = 0;
+    let f = () => {
+      fetch('http://localhost:8080/games/1?version=' + version)
+        .then(results => results.json())
+        .then(data => {
+          console.log(data)
+          version = data._gameVersion;
+          f();
+        })
+    }
+
+    f()
   }
 }
 
