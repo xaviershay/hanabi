@@ -13,18 +13,16 @@ import Data.Hashable
 
 newtype PlayerId = PlayerId Int deriving (Show, Eq, Generic)
 newtype CardId = CardId Int deriving (Show, Eq, Generic)
+type Rank = Int
 
 data Color = Red | Blue | Green | Yellow | White deriving (Show, Enum, Generic)
 data Location = Hand PlayerId | Deck | Board | Discard deriving (Show, Generic)
 
-data Visibility = Hidden | HiddenFrom PlayerId | Visible deriving (Show, Generic)
-
 data Card = Card
   { _cardId :: CardId
-  , _cardRank :: Int
+  , _cardRank :: Rank
   , _cardColor :: Color
   , _cardLocation :: Location
-  , _cardVisibility :: Visibility
   } deriving (Show, Generic)
 
 data PlayerChoice =
@@ -33,10 +31,12 @@ data PlayerChoice =
 
 data Choice = Choice PlayerId PlayerChoice deriving (Show)
 
+type CardMap = M.HashMap CardId Card
+
 data Game = Game
   { _gameVersion :: Integer
   , _gameModified :: UTCTime
-  , _gameCards :: M.HashMap CardId Card
+  , _gameCards :: CardMap
   } deriving (Generic)
 
 makeLenses ''Game
@@ -49,13 +49,38 @@ mkGame now = Game
   , _gameCards = M.fromList [(CardId 1, mkFakeCard)] --mempty
   }
 
+data RedactedCard = RedactedCard
+  { _redactedCardId :: CardId
+  , _redactedLocation :: Location
+  , _redactedColor :: Maybe Color
+  , _redactedRank :: Maybe Rank
+  }
+
 mkFakeCard = Card
   { _cardId = CardId 1
+  , _cardLocation = Hand (PlayerId 123)
   , _cardRank = 2
   , _cardColor = Red
-  , _cardLocation = Hand (PlayerId 123)
-  , _cardVisibility = Visible
   }
+
+mkRedactedCard :: Card -> Maybe Rank -> Maybe Color -> RedactedCard
+mkRedactedCard base rank color = RedactedCard
+  { _redactedCardId = view cardId base
+  , _redactedLocation = view cardLocation base
+  , _redactedRank = rank
+  , _redactedColor = color
+  }
+
+redact :: PlayerId -> [Card] -> [RedactedCard]
+redact pid = map (redactCard pid)
+  where
+    redactCard pid card =
+      case view cardLocation card of
+        Deck                          -> mkRedactedCard card Nothing Nothing
+        Hand cardPid | cardPid == pid -> mkRedactedCard card Nothing Nothing
+        _ -> mkRedactedCard card
+               (Just $ view cardRank card)
+               (Just $ view cardColor card)
 
 apply :: Choice -> Game -> Game
 apply (Choice pid (ChoicePlayCard cid)) =
@@ -64,7 +89,8 @@ apply (Choice pid (ChoicePlayCard cid)) =
     (\card ->
         case view cardLocation card of
           Hand cardPlayerId -> if cardPlayerId == pid then
-                                 set cardLocation Board card
+                                 set cardLocation Board
+                                 $ card
                                else
                                  card
           _ -> card
@@ -72,10 +98,8 @@ apply (Choice pid (ChoicePlayCard cid)) =
 
 apply _ = error "unimplemented"
 
-
 instance ToJSON CardId
 instance ToJSONKey CardId
-instance ToJSON Visibility
 instance ToJSON Location
 instance ToJSON PlayerId
 instance ToJSON Color
