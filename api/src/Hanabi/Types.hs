@@ -16,17 +16,21 @@ newtype CardId = CardId Int deriving (Show, Eq, Generic)
 type Rank = Int
 
 data Color = Red | Blue | Green | Yellow | White deriving (Show, Enum, Generic)
-data Location = Hand PlayerId | Deck | Board | Discard deriving (Show, Generic)
+data Location = Hand PlayerId | Deck | Board | Discard deriving (Show, Generic, Eq)
 
 data Card = Card
   { _cardId :: CardId
   , _cardRank :: Rank
+  , _cardRankHinted :: Bool
   , _cardColor :: Color
+  , _cardColorHinted :: Bool
   , _cardLocation :: Location
   } deriving (Show, Generic)
 
 data PlayerChoice =
   ChoicePlayCard CardId
+  | ChoiceHintRank PlayerId Rank
+  | ChoiceHintColor PlayerId Color
   deriving (Show)
 
 data Choice = Choice PlayerId PlayerChoice deriving (Show)
@@ -46,7 +50,8 @@ mkGame :: UTCTime -> Game
 mkGame now = Game
   { _gameVersion = 1
   , _gameModified = now
-  , _gameCards = M.fromList [(CardId 1, mkFakeCard)] --mempty
+  , _gameCards = M.fromList
+    [(CardId 1, mkFakeCard)] --mempty
   }
 
 data RedactedCard = RedactedCard
@@ -60,7 +65,9 @@ mkFakeCard = Card
   { _cardId = CardId 1
   , _cardLocation = Hand (PlayerId 123)
   , _cardRank = 2
+  , _cardRankHinted = False
   , _cardColor = Red
+  , _cardColorHinted = False
   }
 
 mkRedactedCard :: Card -> Maybe Rank -> Maybe Color -> RedactedCard
@@ -83,7 +90,7 @@ redact pid = map (redactCard pid)
                (Just $ view cardColor card)
 
 apply :: Choice -> Game -> Game
-apply (Choice pid (ChoicePlayCard cid)) =
+apply (Choice pid (ChoicePlayCard cid)) state =
   over
     (gameCards . at cid . _Just)
     (\card ->
@@ -95,8 +102,24 @@ apply (Choice pid (ChoicePlayCard cid)) =
                                  card
           _ -> card
     )
+    state
 
-apply _ = error "unimplemented"
+apply (Choice pid (ChoiceHintRank targetPid rank)) state
+  | pid /= targetPid =
+    let matchedCs =
+          filter (\card -> view cardLocation card == Hand targetPid &&
+                           view cardRank card == rank)
+          . M.elems
+          $ view gameCards state in
+
+    if length matchedCs > 0 then
+      foldr
+        (\card -> set (gameCards . at (view cardId card) . _Just . cardRankHinted) True)
+        state matchedCs
+    else
+      state
+
+apply _ _ = error "unimplemented"
 
 instance ToJSON CardId
 instance ToJSONKey CardId

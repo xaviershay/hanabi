@@ -13,5 +13,5 @@ main = do
   let port = 8080
   state <- mkState
   now  <- liftIO getCurrentTime
-  --putStrLn . show $ (encode . apply (Choice (PlayerId 123) (ChoicePlayCard (CardId 1))) $ mkGame now)
+  putStrLn . show $ (encode . apply (Choice (PlayerId 456) (ChoiceHintRank (PlayerId 123) 2)) $ mkGame now)
   run port (app state)
