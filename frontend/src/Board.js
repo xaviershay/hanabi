@@ -140,7 +140,7 @@ function fillCard(card) {
   let paddingFor = d => {
     if (d.rank === 3 || d.rank === 4) {
       if (d.color === 'yellow') {
-        return px(15)
+        return px(20)
       } else {
         return px(12)
       }
