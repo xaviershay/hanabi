@@ -57,7 +57,7 @@ class App extends Component {
 
   handleClick() {
     let newCards = this.state.cards.map(card => {
-      if (card.cardId == 100) {
+      if (card.cardId === 100) {
         return Object.assign({}, card, {location: ['hand', 'Jared'], rank: 3, color: 'blue'})
       } else {
         return card
@@ -67,7 +67,6 @@ class App extends Component {
   }
 
   render() {
-    console.log(this.state)
     return <div>
       <h1>Hanabi</h1>
       <Board data={this.state.cards} size={[500,500]} />

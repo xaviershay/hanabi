@@ -1,5 +1,4 @@
 import React, { Component } from 'react'
-import { max, select } from 'd3'
 import * as d3array from 'd3-array'
 import * as d3 from 'd3'
 
@@ -44,18 +43,15 @@ class Board extends Component {
     })
 
     let handLocations = d3.set(data.filter(d => d.location[0] === 'hand'), d => d.location.join('-')).values()
-    let table = d3array.group(data.filter(d => d.location[0] === 'table'), d => d.color)
     let discardCards = data
       .filter(d => d.location[0] === 'discard')
       .sort((x, y) => d3.ascending(x.rank, y.rank))
       .map((c, i) => Object.assign({}, c, {index: i}))
 
-    console.log(discardCards)
     let cardsInDeck = data.filter(d => d.location[0] === 'deck').length
     data.push({cardId: 'deck-marker', location: ['deck']})
 
     let cardWidth = 70
-    let numLocations = 2
     let cardHeight = 100
     let margin = 20
 
@@ -93,13 +89,11 @@ class Board extends Component {
       .domain([0])
       .range([margin + 2 * (cardWidth + colSpacer) + colSpacer / 2, margin + 3 * (cardWidth + colSpacer) + colSpacer / 2])
 
-    let deckMargin = 20
     let deckY = d3.scaleOrdinal()
       .domain([0])
       .range([deckMarginY, deckMarginY + cardHeight])
 
     let extent = d3.extent(discardCards, d => d.index)
-    console.log(extent)
     let range = [margin + colSpacer, boardWidth - margin - cardWidth - (colSpacer / 2)]
     let discardX = d3.scaleSequential(d3.interpolateBasis([range[0], range[1]]))
       .domain(extent)
@@ -116,6 +110,7 @@ class Board extends Component {
         case "table": return tableX(d.color);
         case "deck": return deckX(0);
         case "discard": return discardX(d.index);
+        default: return null;
       }
     }
     let yFor = d => {
@@ -124,6 +119,7 @@ class Board extends Component {
         case "table": return tableY(0);
         case "deck": return deckY(0);
         case "discard": return discardY(0);
+        default: return null;
       }
     }
 // Re-populate the contents of a card. This is currently not animated at all,
@@ -131,7 +127,7 @@ class Board extends Component {
 function fillCard(card) {
   card.html("")
   card
-    .filter(d => d.rank == 0)
+    .filter(d => d.rank === 0)
     .append('div')
     .append('i')
       .style('opacity', 0.4)
@@ -167,7 +163,7 @@ function fillCard(card) {
   // TODO: Using mouseover here is pretty lame, and doesn't work at all on
   // touch devices.
   card
-    .filter(d => d.location[0] == 'discard')
+    .filter(d => d.location[0] === 'discard')
     .on("mouseover", function(d, i) {
       d3.select(this)
         .style('z-index', 9000)
@@ -228,7 +224,7 @@ function fillCard(card) {
     d3.select('.deck-marker').text(d => cardsInDeck)
 
     let extractPlayer = d => {
-      if (d.location[0] == 'hand') {
+      if (d.location[0] === 'hand') {
         return d.location[1]
       } else {
         return null
