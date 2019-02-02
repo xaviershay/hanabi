@@ -7,15 +7,17 @@ body {
   margin: 20px;
 }
 .card {
-  font-family: 'Work Sans', sans-serif;
+  /*font-family: 'Work Sans', sans-serif;*/
+  font-family: 'Rakkas', cursive;
   position: absolute;
   width: 70px;
   height: 100px;
   font-size: 36px;
   font-weight: 900;
   text-align: center;
-  border: 1px solid black;
+  border: 1px solid white;
   border-radius: 5px;
+  box-sizing: border-box;
 
   display: flex;
   flex-direction: column;
@@ -29,9 +31,13 @@ background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
 */
 }
 
+.card .number {
+  line-height: 110%;
+}
+.card .icons {
+  font-family: 'Work Sans', sans-serif;
+}
 .card div {
-  margin-top: 1px;
-  margin-bottom: 1px;
 }
 
 .red {
@@ -61,10 +67,14 @@ background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
   flex-direction: column;
   justify-content: space-between;
   justify-content: center;
+  /*
+  margin-top: 5px;
+  margin-bottom: -7px;
+  */
 }
 .icons span {
-  padding-left: 6px;
-  padding-right: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
 }
 .icons i {
   margin: 2px;
