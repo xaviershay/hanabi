@@ -128,6 +128,7 @@ function fillCard(card) {
   card.html("")
   card
     .filter(d => d.rank === 0)
+    .style('justify-content', 'center')
     .append('div')
     .append('i')
       .style('opacity', 0.4)
@@ -147,6 +148,10 @@ function fillCard(card) {
     .filter(d => d.rank > 0)
     .attr('class', d => ['card', d.color].join(' '))
     .call(card => {
+      card.append('div').attr('class', 'top-number small-number').call(top => {
+        top.append('div').text(d => d.rank)
+        top.append('div').text(d => d.rank)
+      })
       card.append('div')
         .attr('class', d=> ['icons', 'icons-' + d.color].join(' '))
         .style('padding-left', paddingFor)
@@ -156,9 +161,10 @@ function fillCard(card) {
           .data(d => Array.from({length: d.rank}, (v, k) => {return {color: d.color, n: k+1}}), d => d.n)
             .join('i')
             .attr('class', d => iconFor(d.color))
-      card.append('div')
-        .attr('class', 'number')
-        .text(d => d.rank)
+      card.append('div').attr('class', 'bottom-number small-number').call(top => {
+        top.append('div').text(d => d.rank)
+        top.append('div').text(d => d.rank)
+      })
     })
   // TODO: Using mouseover here is pretty lame, and doesn't work at all on
   // touch devices.
