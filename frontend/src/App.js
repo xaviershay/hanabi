@@ -41,7 +41,15 @@ class App extends Component {
 
         {cardId: 202, rank: 1, color: 'white', location: ['table']},
         {cardId: 203, rank: 4, color: 'green', location: ['table']},
-        {cardId: 204, rank: 3, color: 'green', location: ['table']}
+        {cardId: 204, rank: 3, color: 'green', location: ['table']},
+
+        {cardId: 881, rank: 2, color: 'blue',   location: ['discard']},
+        {cardId: 882, rank: 2, color: 'blue',   location: ['discard']},
+        {cardId: 883, rank: 3, color: 'white',  location: ['discard']},
+        {cardId: 884, rank: 4, color: 'yellow', location: ['discard']},
+        {cardId: 885, rank: 5, color: 'green',  location: ['discard']},
+        {cardId: 886, rank: 4, color: 'green',  location: ['discard']},
+        {cardId: 887, rank: 4, color: 'green',  location: ['discard']}
       ]
     }
     this.handleClick = this.handleClick.bind(this)
