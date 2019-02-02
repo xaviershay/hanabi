@@ -1,21 +1,28 @@
 body {
-  color: purple;
-  background-color: #ddd;
+  background-color: #white;
+  font-family: 'Rakkas', cursive;
+  margin: 20px;
+}
+
+h1 {
+  font-size: 40px;
+  font-weight: normal;
 }
 
 .board {
-  margin: 20px;
+  position: relative;
+  background-color: #ddd;
+  border-radius: 5px;
+  border: 1px solid black;
 }
 .card {
   /*font-family: 'Work Sans', sans-serif;*/
-  font-family: 'Rakkas', cursive;
   position: absolute;
   width: 70px;
   height: 100px;
   font-size: 36px;
   font-weight: 900;
   text-align: center;
-  border: 1px solid white;
   border-radius: 5px;
   box-sizing: border-box;
 
@@ -61,21 +68,22 @@ background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
 }
 
 .icons {
-  font-size: 14px;
+  font-size: 13px;
   min-height: 40px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   justify-content: center;
-  /*
-  margin-top: 5px;
-  margin-bottom: -7px;
-  */
-}
-.icons span {
-  padding-left: 5px;
-  padding-right: 5px;
 }
 .icons i {
   margin: 2px;
+}
+
+.playerLabel {
+  position: absolute;
+  text-align: center;
+}
+.deck-marker {
+  z-index: 9000;
+  color: white;
 }
