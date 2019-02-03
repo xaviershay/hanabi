@@ -6,7 +6,7 @@ class App extends Component {
   componentDidMount() {
     let version = 0;
     let f = () => {
-      fetch('http://localhost:8080/games/1?version=' + version)
+      fetch('http://localhost:8080/games/1?version=' + version + "&" + (new Date()).getTime())
         .then(results => results.json())
         .then(data => {
           console.log(data)
@@ -23,35 +23,29 @@ class App extends Component {
     super(props)
     this.state = {
       cards: [
-        /*
-        {cardId: 1, rank: 2, color: 'red', location: ['hand', 'Jared']},
-        {cardId: 2, rank: 2, color: 'red', location: ['hand', 'Jared']},
-        {cardId: 3, rank: 3, color: 'white', location: ['hand', 'Jared']},
-        {cardId: 4, rank: 4, color: 'yellow', location: ['hand', 'Jared']},
-        {cardId: 5, rank: 5, color: 'green', location: ['hand', 'Jared']},
-
-        {cardId: 6, location: ['hand', 'Xavier']},
-        {cardId: 7, location: ['hand', 'Xavier']},
-        {cardId: 8, location: ['hand', 'Xavier']},
-        {cardId: 9, location: ['hand', 'Xavier']},
-        {cardId: 10, location: ['hand', 'Xavier']},
-
-        {cardId: 100, location: ['deck']},
-        {cardId: 101, location: ['deck']},
-        {cardId: 102, location: ['deck']},
-
-        {cardId: 202, rank: 1, color: 'white', location: ['table']},
-        {cardId: 203, rank: 4, color: 'green', location: ['table']},
-        {cardId: 204, rank: 3, color: 'green', location: ['table']},
-
-        {cardId: 881, rank: 2, color: 'blue',   location: ['discard']},
-        {cardId: 882, rank: 2, color: 'blue',   location: ['discard']},
-        {cardId: 883, rank: 3, color: 'white',  location: ['discard']},
-        {cardId: 884, rank: 4, color: 'yellow', location: ['discard']},
-        {cardId: 885, rank: 5, color: 'green',  location: ['discard']},
-        {cardId: 886, rank: 4, color: 'green',  location: ['discard']},
-        {cardId: 887, rank: 4, color: 'green',  location: ['discard']}
-        */
+        {id: 1, rank: 2, color: 'red', location: ['hand', 'Jared']},
+        {id: 2, rank: 2, color: 'red', location: ['hand', 'Jared']},
+        {id: 3, rank: 3, color: 'white', location: ['hand', 'Jared']},
+        {id: 4, rank: 4, color: 'yellow', location: ['hand', 'Jared']},
+        {id: 5, rank: 5, color: 'green', location: ['hand', 'Jared']},
+        {id: 6, location: ['hand', 'Xavier']},
+        {id: 7, location: ['hand', 'Xavier']},
+        {id: 8, location: ['hand', 'Xavier']},
+        {id: 9, location: ['hand', 'Xavier']},
+        {id: 10, location: ['hand', 'Xavier']},
+        {id: 100, location: ['deck']},
+        {id: 101, location: ['deck']},
+        {id: 102, location: ['deck']},
+        {id: 202, rank: 1, color: 'white', location: ['table']},
+        {id: 203, rank: 4, color: 'green', location: ['table']},
+        {id: 204, rank: 3, color: 'green', location: ['table']},
+        {id: 881, rank: 2, color: 'blue',   location: ['discard']},
+        {id: 882, rank: 2, color: 'blue',   location: ['discard']},
+        {id: 883, rank: 3, color: 'white',  location: ['discard']},
+        {id: 884, rank: 4, color: 'yellow', location: ['discard']},
+        {id: 885, rank: 5, color: 'green',  location: ['discard']},
+        {id: 886, rank: 4, color: 'green',  location: ['discard']},
+        {id: 887, rank: 4, color: 'green',  location: ['discard']}
       ]
     }
     this.handleClick = this.handleClick.bind(this)
@@ -71,6 +65,44 @@ class App extends Component {
   render() {
     return <div>
       <h1>Hanabi</h1>
+      <div class='new-board'>
+        <div class='card--container flipped' style={{left: 20, top: 240}}>
+          <div class='face card--back'>
+          </div>
+          <div class='face card--front'>
+            <div style={{ opacity: 0.5}}><i class='fas fa-leaf'></i></div>
+          </div>
+        </div>
+
+        <div class='card--container' style={{left: 120, top: 240}}>
+          <div class='face card--back'>
+          </div>
+          <div class='face card--front green card-placeholder'>
+            <div style={{ opacity: 0.5}}><i class='fas fa-leaf'></i></div>
+          </div>
+        </div>
+
+        <div class='card--container' style={{left: 220, top: 240}}>
+          <div class='face card--back'>
+          </div>
+          <div class='face card--front red card-number'>
+            <div class="top-number small-number">
+              <div>2</div>
+              <div>2</div>
+            </div>
+            <div class="card--icons card--icons-2">
+              <span>
+                <i class='fas fa-heart'></i>
+                <i class='fas fa-heart'></i>
+              </span>
+            </div>
+            <div class="bottom-number small-number">
+              <div>2</div>
+              <div>2</div>
+            </div>
+          </div>
+        </div>
+      </div>
       <Board data={this.state.cards} size={[500,500]} />
       <button onClick={() => this.handleClick()}>Test</button>
     </div>

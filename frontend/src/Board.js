@@ -107,7 +107,7 @@ class Board extends Component {
       .range([discardMarginY, discardMarginY + cardHeight])
 
     let t = d3.select(node).transition()
-      .duration(750)
+      .duration(500)
 
     let xFor = d => {
       switch (d.location[0]) {
@@ -134,11 +134,21 @@ function fillCard(card) {
   card.html("")
   card
     .filter(d => d.rank === 0)
-    .style('justify-content', 'center')
-    .style('opacity', 0.4)
-    .append('div')
-    .append('i')
-      .attr('class', d => iconFor(d.color))
+    .call(card => {
+      card.append('div')
+        .attr('class', 'face face--back')
+        .style('background-color', 'purple')
+        .style('transform', 'rotateX(180deg)')
+        .text("hello")
+
+      card.append('div')
+        .attr('class', 'face face--front')
+        .style('justify-content', 'center')
+        .style('opacity', 0.4)
+        .append('div')
+        .append('i')
+          .attr('class', d => iconFor(d.color))
+    })
 
   let paddingFor = d => {
     if (d.rank === 3 || d.rank === 4) {
@@ -150,6 +160,7 @@ function fillCard(card) {
     }
     return null
   }
+
   card
     .filter(d => d.rank > 0)
     .attr('class', d => ['card', d.color].join(' '))
@@ -217,6 +228,16 @@ function fillCard(card) {
                         return dealCount * 50
                       })
                       .call(placeCard)
+                      .style('transform-origin', 'center top')
+                      .styleTween('transform', function() {
+                        return function(t) {
+                          let zHeight = 50
+                          let z = (Math.pow(0.5, 2) - Math.pow(t - 0.5, 2)) * 4 * zHeight
+                          return "translateZ(" + z + "px) " +
+                            "translateY(" + (100 - (t * 100)) + "%) " +
+                            "rotateX(" + (t * 180 + 180) + "deg)"
+                        }
+                      })
                     )
                 }
               })
