@@ -17,10 +17,12 @@ instance ToJSON Color where
   toJSON Yellow = "yellow"
 
 instance ToJSON Location where
-  toJSON (Hand (PlayerId pid)) = toJSON ["hand", show (pid :: Int)]
-  toJSON Deck = "deck"
-  toJSON Discard = "discard"
-  toJSON Table = "table"
+  toJSON = toJSON . toList
+    where
+      toList (Hand (PlayerId pid)) = ["hand", pid]
+      toList Deck = ["deck"]
+      toList Discard = ["discard"]
+      toList Table = ["table"]
 
 instance ToJSON RedactedCard where
   toJSON card = object

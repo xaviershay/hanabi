@@ -10,7 +10,8 @@ class App extends Component {
         .then(results => results.json())
         .then(data => {
           console.log(data)
-          version = data._gameVersion;
+          this.setState({cards: data.cards})
+          version = data.version;
           f();
         })
     }
@@ -21,8 +22,8 @@ class App extends Component {
   constructor(props) {
     super(props)
     this.state = {
-      value: [5, 10, 1, 3],
       cards: [
+        /*
         {cardId: 1, rank: 2, color: 'red', location: ['hand', 'Jared']},
         {cardId: 2, rank: 2, color: 'red', location: ['hand', 'Jared']},
         {cardId: 3, rank: 3, color: 'white', location: ['hand', 'Jared']},
@@ -50,6 +51,7 @@ class App extends Component {
         {cardId: 885, rank: 5, color: 'green',  location: ['discard']},
         {cardId: 886, rank: 4, color: 'green',  location: ['discard']},
         {cardId: 887, rank: 4, color: 'green',  location: ['discard']}
+        */
       ]
     }
     this.handleClick = this.handleClick.bind(this)
@@ -57,8 +59,8 @@ class App extends Component {
 
   handleClick() {
     let newCards = this.state.cards.map(card => {
-      if (card.cardId === 100) {
-        return Object.assign({}, card, {location: ['hand', 'Jared'], rank: 3, color: 'blue'})
+      if (card.id === 1) {
+        return Object.assign({}, card, {location: ['hand', 'Xavier'], rank: 3, color: 'blue'})
       } else {
         return card
       }

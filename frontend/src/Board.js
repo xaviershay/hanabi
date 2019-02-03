@@ -32,6 +32,10 @@ class Board extends Component {
     const node = this.node
     const rawData = this.props.data
 
+    if (rawData.length === 0) {
+      return
+    }
+
     const data =
       Array.from(d3array.group(rawData, d => d.location.join('-')).values())
         .flatMap(cs => cs.sort((x, y) => d3.ascending(x.rank, y.rank)).map((c, i) => Object.assign({}, c, {index: i})))
@@ -39,7 +43,7 @@ class Board extends Component {
     let allColors = ['red', 'green', 'yellow', 'blue', 'white']
 
     allColors.forEach(color => {
-      data.push({cardId: '0-' + color, rank: 0, color: color, location: ['table']})
+      data.push({id: '0-' + color, rank: 0, color: color, location: ['table']})
     })
 
     let handLocations = d3.set(data.filter(d => d.location[0] === 'hand'), d => d.location.join('-')).values()
@@ -49,7 +53,7 @@ class Board extends Component {
       .map((c, i) => Object.assign({}, c, {index: i}))
 
     let cardsInDeck = data.filter(d => d.location[0] === 'deck').length
-    data.push({cardId: 'deck-marker', location: ['deck']})
+    data.push({id: 'deck-marker', location: ['deck']})
 
     let cardWidth = 70
     let cardHeight = 100
@@ -102,7 +106,8 @@ class Board extends Component {
       .domain([0])
       .range([discardMarginY, discardMarginY + cardHeight])
 
-    let t = d3.select(node).transition().duration(750)
+    let t = d3.select(node).transition()
+      .duration(750)
 
     let xFor = d => {
       switch (d.location[0]) {
@@ -122,6 +127,7 @@ class Board extends Component {
         default: return null;
       }
     }
+
 // Re-populate the contents of a card. This is currently not animated at all,
 // may need to un-DRY this if we want to do that.
 function fillCard(card) {
@@ -180,27 +186,42 @@ function fillCard(card) {
     })
 }
 
-
+    let dealCount = 0
     d3.select(node)
       .style('width', px(boardWidth))
       .style('height', px(boardHeight))
       .selectAll('.card')
-        .data(data, d => d.cardId)
+        .data(data, d => d.id)
         .join(
           enter => {
             let card = enter.append('div')
               .attr('class', d => ['card', d.color].join(' '))
               .style('width', d => px(cardWidth))
               .style('height', d => px(cardHeight))
-              .style('left', d => px(deckX(0)))
-              .style('top', d => px(deckY(0)))
               .style('z-index', d => 100 + d.rank)
-              .call(enter => enter.transition(t)
-                .style('left', d => px(xFor(d)))
-                .style('top', d => px(yFor(d)))
-              )
+              .each(function(d) {
+                let cardNode = d3.select(this)
+                let placeCard =
+                  card => card
+                    .style('left', d => px(xFor(d)))
+                    .style('top', d => px(yFor(d)))
+                if (d.rank === 0 || d.id === 'deck-marker') {
+                  cardNode.call(placeCard)
+                } else {
+                  cardNode
+                    .style('left', d => px(deckX(0)))
+                    .style('top', d => px(deckY(0)))
+                    .call(enter => enter.transition(t)
+                      .delay((d, i) => {
+                        dealCount += 1
+                        return dealCount * 50
+                      })
+                      .call(placeCard)
+                    )
+                }
+              })
             card
-              .filter(d => d.cardId === 'deck-marker')
+              .filter(d => d.id === 'deck-marker')
               .attr('class', 'card deck-marker')
               .attr('z-index', 1000)
 

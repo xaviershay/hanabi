@@ -85,7 +85,7 @@ getGame gameId maybeVersion = do
   -- TODO: Identify the calling player and appropriately redact.
   return
     . addHeader (RFC1123Time . view gameModified $ g)
-    $ RedactedGame (PlayerId 123) g
+    $ RedactedGame (PlayerId "Xavier") g
 
 findGame :: Int -> AppM (TVar Game)
 findGame gameId = do

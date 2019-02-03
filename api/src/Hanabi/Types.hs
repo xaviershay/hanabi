@@ -13,7 +13,7 @@ import Data.Hashable
 
 data RedactedGame = RedactedGame PlayerId Game
 
-newtype PlayerId = PlayerId Int deriving (Show, Eq, Generic)
+newtype PlayerId = PlayerId String deriving (Show, Eq, Generic)
 newtype CardId = CardId Int deriving (Show, Eq, Generic)
 type Rank = Int
 
@@ -61,12 +61,17 @@ mkGame now = Game
   { _gameVersion = 1
   , _gameModified = now
   , _gameCards = M.fromList
-    [(CardId 1, mkFakeCard)] --mempty
+    [ (CardId 1, set cardId (CardId 1) $ mkFakeCard)
+    , (CardId 2, set cardId (CardId 2) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
+    , (CardId 3, set cardId (CardId 3) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
+    , (CardId 4, set cardId (CardId 4) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
+    , (CardId 5, set cardId (CardId 5) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
+    ] --mempty
   }
 
 mkFakeCard = Card
   { _cardId = CardId 1
-  , _cardLocation = Hand (PlayerId 123)
+  , _cardLocation = Deck
   , _cardRank = 2
   , _cardRankHinted = False
   , _cardColor = Red
