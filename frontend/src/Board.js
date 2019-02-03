@@ -16,10 +16,97 @@ function iconFor(color) {
   }[color]
 }
 
+function makeRange(n) {
+  return Array.from({length: n}, (v, k) => k+1)
+}
+
+function trace(x) {
+  console.log(x)
+  return x
+}
+
+function isFlipped(d) {
+  return d.rank === undefined
+}
+
+function flipCard(d) {
+  if (isFlipped(d)) {
+    d3.select(this)
+      /* Order of operations important! Translate has to come first. */
+      .style('transform', 'translate3d(0, -100%, 1px) rotateX(-180deg)')
+  }
+}
+
+function createNumberCardFront(front, d) {
+  front
+    // TODO: face and card--front classes are duplicated here and in
+    // caller
+    .attr('class', [
+      'face',
+      'card--front',
+      'card--color-' + d.color,
+      'card--rank-' + d.rank,
+      'card-number'
+    ].join(' '))
+
+  front.append('div')
+    .attr('class', 'top-number small-number')
+    .call(div => {
+      div.append('div').text(d.rank)
+      div.append('div').text(d.rank)
+    })
+
+  front.append('div')
+    .attr('class', 'card--icons')
+    .append('span')
+      .selectAll('i')
+      .data(
+        d => makeRange(d.rank).map(n => { return {color: d.color, n: n}}),
+        d => d.n
+      )
+        .join('i')
+        .attr('class', d => iconFor(d.color))
+
+  front.append('div')
+    .attr('class', 'bottom-number small-number')
+    .call(div => {
+      div.append('div').text(d.rank)
+      div.append('div').text(d.rank)
+    })
+}
+
+function createPlaceholderCardFront(front, d) {
+  front
+    // TODO: face and card--front classes are duplicated here and in
+    // caller
+    .attr('class', [
+      'face',
+      'card--front',
+      'card--color-' + d.color,
+      'card-placeholder'
+    ].join(' '))
+
+  front.append('i').attr('class', d => iconFor(d.color))
+}
+
+function createCardFront(d) {
+  let front = d3.select(this)
+  //console.log(front, d)
+
+  if (d.rank !== undefined && d.color) {
+    if (d.rank > 0) {
+      createNumberCardFront(front, d)
+    } else {
+      createPlaceholderCardFront(front, d)
+    }
+  }
+}
+
 class Board extends Component {
   constructor(props){
     super(props)
     this.createBoard = this.createBoard.bind(this)
+    this.previousData = d3.local()
   }
   componentDidMount() {
     this.createBoard()
@@ -46,7 +133,8 @@ class Board extends Component {
       data.push({id: '0-' + color, rank: 0, color: color, location: ['table']})
     })
 
-    let handLocations = d3.set(data.filter(d => d.location[0] === 'hand'), d => d.location.join('-')).values()
+    //let handLocations = d3.set(data.filter(d => d.location[0] === 'hand'), d => d.location.join('-')).values()
+    let handLocations = ['hand-Jared', 'hand-Xavier']
     let discardCards = data
       .filter(d => d.location[0] === 'discard')
       .sort((x, y) => d3.ascending(x.rank, y.rank))
@@ -96,6 +184,7 @@ class Board extends Component {
     let deckY = d3.scaleOrdinal()
       .domain([0])
       .range([deckMarginY, deckMarginY + cardHeight])
+    console.log(deckX("Jared"), deckX("Xavier"))
 
     let extent = d3.extent(discardCards, d => d.index)
     let range = [margin + colSpacer, boardWidth - margin - cardWidth - (colSpacer / 2)]
@@ -107,7 +196,7 @@ class Board extends Component {
       .range([discardMarginY, discardMarginY + cardHeight])
 
     let t = d3.select(node).transition()
-      .duration(500)
+      .duration(10000)
 
     let xFor = d => {
       switch (d.location[0]) {
@@ -128,148 +217,252 @@ class Board extends Component {
       }
     }
 
-// Re-populate the contents of a card. This is currently not animated at all,
-// may need to un-DRY this if we want to do that.
-function fillCard(card) {
-  card.html("")
-  card
-    .filter(d => d.rank === 0)
-    .call(card => {
-      card.append('div')
-        .attr('class', 'face face--back')
-        .style('background-color', 'purple')
-        .style('transform', 'rotateX(180deg)')
-        .text("hello")
+    let previousData = this.previousData
 
-      card.append('div')
-        .attr('class', 'face face--front')
-        .style('justify-content', 'center')
-        .style('opacity', 0.4)
-        .append('div')
-        .append('i')
-          .attr('class', d => iconFor(d.color))
-    })
-
-  let paddingFor = d => {
-    if (d.rank === 3 || d.rank === 4) {
-      if (d.color === 'yellow') {
-        return px(20)
-      } else {
-        return px(12)
-      }
-    }
-    return null
-  }
-
-  card
-    .filter(d => d.rank > 0)
-    .attr('class', d => ['card', d.color].join(' '))
-    .call(card => {
-      card.append('div').attr('class', 'top-number small-number').call(top => {
-        top.append('div').text(d => d.rank)
-        top.append('div').text(d => d.rank)
-      })
-      card.append('div')
-        .attr('class', d=> ['icons', 'icons-' + d.color].join(' '))
-        .style('padding-left', paddingFor)
-        .style('padding-right', paddingFor)
-        .append('span')
-          .selectAll('i')
-          .data(d => Array.from({length: d.rank}, (v, k) => {return {color: d.color, n: k+1}}), d => d.n)
-            .join('i')
-            .attr('class', d => iconFor(d.color))
-      card.append('div').attr('class', 'bottom-number small-number').call(top => {
-        top.append('div').text(d => d.rank)
-        top.append('div').text(d => d.rank)
-      })
-    })
-  // TODO: Using mouseover here is pretty lame, and doesn't work at all on
-  // touch devices.
-  card
-    .filter(d => d.location[0] === 'discard')
-    .on("mouseover", function(d, i) {
-      d3.select(this)
-        .style('z-index', 9000)
-    })
-    .on("mouseout", function(d, i){
-      d3.select(this)
-        .style('z-index', d => d.index)
-    })
-}
-
-    let dealCount = 0
     d3.select(node)
       .style('width', px(boardWidth))
       .style('height', px(boardHeight))
-      .selectAll('.card')
+      .selectAll('.card--container')
         .data(data, d => d.id)
-        .join(
-          enter => {
-            let card = enter.append('div')
-              .attr('class', d => ['card', d.color].join(' '))
-              .style('width', d => px(cardWidth))
-              .style('height', d => px(cardHeight))
-              .style('z-index', d => 100 + d.rank)
-              .each(function(d) {
-                let cardNode = d3.select(this)
-                let placeCard =
-                  card => card
-                    .style('left', d => px(xFor(d)))
-                    .style('top', d => px(yFor(d)))
-                if (d.rank === 0 || d.id === 'deck-marker') {
-                  cardNode.call(placeCard)
-                } else {
-                  cardNode
-                    .style('left', d => px(deckX(0)))
-                    .style('top', d => px(deckY(0)))
-                    .call(enter => enter.transition(t)
-                      .delay((d, i) => {
-                        dealCount += 1
-                        return dealCount * 50
-                      })
-                      .call(placeCard)
-                      .style('transform-origin', 'center top')
-                      .styleTween('transform', function() {
-                        return function(t) {
-                          let zHeight = 50
-                          let z = (Math.pow(0.5, 2) - Math.pow(t - 0.5, 2)) * 4 * zHeight
-                          return "translateZ(" + z + "px) " +
-                            "translateY(" + (100 - (t * 100)) + "%) " +
-                            "rotateX(" + (t * 180 + 180) + "deg)"
-                        }
-                      })
-                    )
-                }
-              })
-            card
-              .filter(d => d.id === 'deck-marker')
-              .attr('class', 'card deck-marker')
-              .attr('z-index', 1000)
+        .call(card => {
+          card.join(
+            enter => {
+              enter.append('div')
+                .attr('class', 'card--container')
+                .style('left', d => px(xFor(d)))
+                .style('top', d => px(yFor(d)))
+                .call(container => {
+                  container.append('div')
+                    .attr('class', 'face card--back')
+                  container.append('div')
+                    .attr('class', 'face card--front')
+                    .each(createCardFront)
+                })
+                .each(flipCard)
+            },
+            update => {
+              let delayCounter = 0
 
-            card
-              .filter(d => d.location[0] === 'discard')
-              .style('z-index', d => d.index)
+              // Animate left/top from previous data to new data
+              update
+                .each(function(d) {
+                  let prev = previousData.get(this)
+                  let cardNode = d3.select(this)
+                  if (prev) {
+                    let lastX = xFor(prev)
+                    let lastY = yFor(prev)
+                    let lastFlipped = isFlipped(prev)
+                    let nowX = xFor(d)
+                    let nowY = yFor(d)
+                    let nowFlipped = isFlipped(d)
 
-            card
-              .filter(d => d.rank !== undefined && d.color)
-              .call(fillCard)
-          }
-          ,
-          update => {
-            update
-              .style('z-index', d => d.rank)
-              .call(update => {
-                update.transition(t)
-                  .style('left', d => px(xFor(d)))
-                  .style('top', d => px(yFor(d)))
-                update
-                  .filter(d => d.rank !== undefined && d.color)
-                  .call(fillCard)
-              })
-          }
-        )
+                    if (lastFlipped != nowFlipped) {
+                      // recreate card face, since revealing new information!
+                      cardNode.select('.card--front')
+                        .html("")
+                        .each(createCardFront)
+                    }
 
-    d3.select('.deck-marker').text(d => cardsInDeck)
+                    if (lastX !== nowX || lastY !== nowY || lastFlipped !== nowFlipped) {
+                      cardNode
+                        .style('left', d => px(xFor(prev)))
+                        .style('top', d => px(yFor(prev)))
+                        .transition(t)
+                          .delay((d, i) => delayCounter * 100)
+                          .style('left', d => px(xFor(d)))
+                          .style('top', d => px(yFor(d)))
+                          .styleTween('transform', function() {
+                            if (lastFlipped && !nowFlipped) {
+                              // Flip from back to front
+                              return function(t) {
+                                let zHeight = 50
+                                let z = (Math.pow(0.5, 2) - Math.pow(t - 0.5, 2)) * 4 * zHeight
+                                return "" +
+                                  "translateZ(" + z + "px) " +
+                                  "translateY(" + (-100 + t * 100) + "%) " +
+                                  "rotateX(" + (-180 + t * 180) + "deg)"
+                              }
+                            } else if (!lastFlipped && nowFlipped) {
+                              console.log("UNIMPLEMENTED: Flipping card face down")
+                            } else if (prev.location !== d.location) {
+                              // No flip, just animate Z
+                              return function(t) {
+                                let zHeight = 50
+                                let z = (Math.pow(0.5, 2) - Math.pow(t - 0.5, 2)) * 4 * zHeight
+                                return "" +
+                                  "translateZ(" + z + "px) "
+                              }
+                            }
+                          })
+                      delayCounter += 1
+                    }
+                  } else {
+                    cardNode
+                      .style('left', d => px(xFor(d)))
+                      .style('top', d => px(yFor(d)))
+                  }
+                })
+
+              // If card is flipping (compared to previous), flip it
+            }
+          )
+        })
+
+    // Re-grab selection to make sure we have all elements to store current
+    // data as previous. It's possible to do this in the prior selection, but
+    // it's subtle to get right and requires some duplication. Simpler to just
+    // select again.
+    //
+    // Need to use a function here rather than lambda so that `this` is set
+    // correctly.
+    d3.select(node)
+      .selectAll('.card--container')
+      .each(function(d) { previousData.set(this, d); })
+
+
+
+//// Re-populate the contents of a card. This is currently not animated at all,
+//// may need to un-DRY this if we want to do that.
+//function fillCard(card) {
+//  card.html("")
+//  card
+//    .filter(d => d.rank === 0)
+//    .call(card => {
+//      card.append('div')
+//        .attr('class', 'face face--back')
+//        .style('background-color', 'purple')
+//        .style('transform', 'rotateX(180deg)')
+//        .text("hello")
+//
+//      card.append('div')
+//        .attr('class', 'face face--front')
+//        .style('justify-content', 'center')
+//        .style('opacity', 0.4)
+//        .append('div')
+//        .append('i')
+//          .attr('class', d => iconFor(d.color))
+//    })
+//
+//  let paddingFor = d => {
+//    if (d.rank === 3 || d.rank === 4) {
+//      if (d.color === 'yellow') {
+//        return px(20)
+//      } else {
+//        return px(12)
+//      }
+//    }
+//    return null
+//  }
+//
+//  card
+//    .filter(d => d.rank > 0)
+//    .attr('class', d => ['card', d.color].join(' '))
+//    .call(card => {
+//      card.append('div').attr('class', 'top-number small-number').call(top => {
+//        top.append('div').text(d => d.rank)
+//        top.append('div').text(d => d.rank)
+//      })
+//      card.append('div')
+//        .attr('class', d=> ['icons', 'icons-' + d.color].join(' '))
+//        .style('padding-left', paddingFor)
+//        .style('padding-right', paddingFor)
+//        .append('span')
+//          .selectAll('i')
+//          .data(d => Array.from({length: d.rank}, (v, k) => {return {color: d.color, n: k+1}}), d => d.n)
+//            .join('i')
+//            .attr('class', d => iconFor(d.color))
+//      card.append('div').attr('class', 'bottom-number small-number').call(top => {
+//        top.append('div').text(d => d.rank)
+//        top.append('div').text(d => d.rank)
+//      })
+//    })
+//  // TODO: Using mouseover here is pretty lame, and doesn't work at all on
+//  // touch devices.
+//  card
+//    .filter(d => d.location[0] === 'discard')
+//    .on("mouseover", function(d, i) {
+//      d3.select(this)
+//        .style('z-index', 9000)
+//    })
+//    .on("mouseout", function(d, i){
+//      d3.select(this)
+//        .style('z-index', d => d.index)
+//    })
+//}
+//
+//    let dealCount = 0
+//    d3.select(node)
+//      .style('width', px(boardWidth))
+//      .style('height', px(boardHeight))
+//      .selectAll('.card')
+//        .data(data, d => d.id)
+//        .join(
+//          enter => {
+//            let card = enter.append('div')
+//              .attr('class', d => ['card', d.color].join(' '))
+//              .style('width', d => px(cardWidth))
+//              .style('height', d => px(cardHeight))
+//              .style('z-index', d => 100 + d.rank)
+//              .each(function(d) {
+//                let cardNode = d3.select(this)
+//                let placeCard =
+//                  card => card
+//                    .style('left', d => px(xFor(d)))
+//                    .style('top', d => px(yFor(d)))
+//                if (d.rank === 0 || d.id === 'deck-marker') {
+//                  cardNode.call(placeCard)
+//                } else {
+//                  cardNode
+//                    .style('left', d => px(deckX(0)))
+//                    .style('top', d => px(deckY(0)))
+//                    .call(enter => enter.transition(t)
+//                      .delay((d, i) => {
+//                        dealCount += 1
+//                        return dealCount * 50
+//                      })
+//                      .call(placeCard)
+//                      .style('transform-origin', 'center top')
+//                      .styleTween('transform', function() {
+//                        return function(t) {
+//                          let zHeight = 50
+//                          let z = (Math.pow(0.5, 2) - Math.pow(t - 0.5, 2)) * 4 * zHeight
+//                          return "translateZ(" + z + "px) " +
+//                            "translateY(" + (100 - (t * 100)) + "%) " +
+//                            "rotateX(" + (t * 180 + 180) + "deg)"
+//                        }
+//                      })
+//                    )
+//                }
+//              })
+//            card
+//              .filter(d => d.id === 'deck-marker')
+//              .attr('class', 'card deck-marker')
+//              .attr('z-index', 1000)
+//
+//            card
+//              .filter(d => d.location[0] === 'discard')
+//              .style('z-index', d => d.index)
+//
+//            card
+//              .filter(d => d.rank !== undefined && d.color)
+//              .call(fillCard)
+//          }
+//          ,
+//          update => {
+//            update
+//              .style('z-index', d => d.rank)
+//              .call(update => {
+//                update.transition(t)
+//                  .style('left', d => px(xFor(d)))
+//                  .style('top', d => px(yFor(d)))
+//                update
+//                  .filter(d => d.rank !== undefined && d.color)
+//                  .call(fillCard)
+//              })
+//          }
+//        )
+//
+//    d3.select('.deck-marker').text(d => cardsInDeck)
 
     let extractPlayer = d => {
       if (d.location[0] === 'hand') {
@@ -280,7 +473,7 @@ function fillCard(card) {
     }
     d3.select(node)
       .selectAll('.playerLabel')
-      .data(d3.set(data.map(extractPlayer).filter(d => d)).values())
+      .data(handLocations.map(x => x.split('-')[1]))
         .join('div')
           .attr('class', 'playerLabel')
           .style('width', px(boardWidth - margin*2))

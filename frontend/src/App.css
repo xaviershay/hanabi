@@ -142,7 +142,6 @@ background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
   width: 70px;
   height: 100px;
   transform-origin: center bottom;
-  /* Order of operations important! Translate has to come first. */
   transform-style: preserve-3d;
 }
 
@@ -176,6 +175,10 @@ background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
   font-size: 36px;
 }
 
+.card-placeholder i {
+  opacity: 0.4
+}
+
 .card-number {
   text-align: center;
   display: flex;
@@ -183,4 +186,24 @@ background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
 }
 .card-number i {
   margin: 2px;
+}
+
+.card--color-red {
+  color: #d50000;
+}
+
+.card--color-green {
+  color: #1b5e20;
+}
+
+.card--color-yellow {
+  color: #fbc02d;
+}
+
+.card--color-blue {
+  color: #0d47a1;
+}
+
+.card--color-white {
+  color: white;
 }
