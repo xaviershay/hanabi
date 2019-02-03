@@ -129,9 +129,9 @@ function fillCard(card) {
   card
     .filter(d => d.rank === 0)
     .style('justify-content', 'center')
+    .style('opacity', 0.4)
     .append('div')
     .append('i')
-      .style('opacity', 0.4)
       .attr('class', d => iconFor(d.color))
 
   let paddingFor = d => {
