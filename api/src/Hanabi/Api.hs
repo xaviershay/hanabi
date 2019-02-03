@@ -8,6 +8,7 @@ module Hanabi.Api
   ) where
 
 import Hanabi.Types
+import Hanabi.Json
 
 import           Network.Wai.Middleware.Cors          (cors, corsRequestHeaders,
                                                        simpleCorsResourcePolicy)
@@ -38,7 +39,7 @@ newtype State = State
 type AppM = ReaderT State Handler
 type MyAPI =
   "_status" :> Get '[JSON] ()
-  :<|> "games" :> Capture "id" Int :> QueryParam "version" Integer :> Get '[JSON] (Headers '[LastModifiedHeader] Game)
+  :<|> "games" :> Capture "id" Int :> QueryParam "version" Integer :> Get '[JSON] (Headers '[LastModifiedHeader] RedactedGame)
 
 mkState :: IO State
 mkState = do
@@ -70,7 +71,7 @@ server = getStatus :<|> getGame
 getStatus :: AppM ()
 getStatus = return ()
 
-getGame :: Int -> Maybe Integer -> AppM (Headers '[LastModifiedHeader] Game)
+getGame :: Int -> Maybe Integer -> AppM (Headers '[LastModifiedHeader] RedactedGame)
 getGame gameId maybeVersion = do
   let currentVersion = fromMaybe 0 maybeVersion
 
@@ -84,7 +85,7 @@ getGame gameId maybeVersion = do
   -- TODO: Identify the calling player and appropriately redact.
   return
     . addHeader (RFC1123Time . view gameModified $ g)
-    $ g
+    $ RedactedGame (PlayerId 123) g
 
 findGame :: Int -> AppM (TVar Game)
 findGame gameId = do

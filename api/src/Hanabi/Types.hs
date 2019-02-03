@@ -11,12 +11,14 @@ import Data.Time.Clock (UTCTime)
 import qualified Data.HashMap.Strict as M
 import Data.Hashable
 
+data RedactedGame = RedactedGame PlayerId Game
+
 newtype PlayerId = PlayerId Int deriving (Show, Eq, Generic)
 newtype CardId = CardId Int deriving (Show, Eq, Generic)
 type Rank = Int
 
 data Color = Red | Blue | Green | Yellow | White deriving (Show, Enum, Generic)
-data Location = Hand PlayerId | Deck | Board | Discard deriving (Show, Generic, Eq)
+data Location = Hand PlayerId | Deck | Table | Discard deriving (Show, Generic, Eq)
 
 data Card = Card
   { _cardId :: CardId
@@ -41,17 +43,6 @@ data Game = Game
   { _gameVersion :: Integer
   , _gameModified :: UTCTime
   , _gameCards :: CardMap
-  } deriving (Generic)
-
-makeLenses ''Game
-makeLenses ''Card
-
-mkGame :: UTCTime -> Game
-mkGame now = Game
-  { _gameVersion = 1
-  , _gameModified = now
-  , _gameCards = M.fromList
-    [(CardId 1, mkFakeCard)] --mempty
   }
 
 data RedactedCard = RedactedCard
@@ -59,6 +50,18 @@ data RedactedCard = RedactedCard
   , _redactedLocation :: Location
   , _redactedColor :: Maybe Color
   , _redactedRank :: Maybe Rank
+  }
+
+makeLenses ''Game
+makeLenses ''Card
+makeLenses ''RedactedCard
+
+mkGame :: UTCTime -> Game
+mkGame now = Game
+  { _gameVersion = 1
+  , _gameModified = now
+  , _gameCards = M.fromList
+    [(CardId 1, mkFakeCard)] --mempty
   }
 
 mkFakeCard = Card
@@ -96,7 +99,7 @@ apply (Choice pid (ChoicePlayCard cid)) state =
     (\card ->
         case view cardLocation card of
           Hand cardPlayerId -> if cardPlayerId == pid then
-                                 set cardLocation Board
+                                 set cardLocation Table
                                  $ card
                                else
                                  card
@@ -121,11 +124,5 @@ apply (Choice pid (ChoiceHintRank targetPid rank)) state
 
 apply _ _ = error "unimplemented"
 
-instance ToJSON CardId
-instance ToJSONKey CardId
-instance ToJSON Location
-instance ToJSON PlayerId
-instance ToJSON Color
-instance ToJSON Card
-instance ToJSON Game
+
 instance Hashable CardId
