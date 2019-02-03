@@ -123,7 +123,7 @@ class Board extends Component {
       return
     }
 
-    const data =
+    let data =
       Array.from(d3array.group(rawData, d => d.location.join('-')).values())
         .flatMap(cs => cs.sort((x, y) => d3.ascending(x.rank, y.rank)).map((c, i) => Object.assign({}, c, {index: i})))
 
@@ -133,12 +133,28 @@ class Board extends Component {
       data.push({id: '0-' + color, rank: 0, color: color, location: ['table']})
     })
 
+    let highestRankFor = new Map()
+    d3array
+      .group(data.filter(c => c.location[0] == 'table'), d => d.color)
+      .forEach((cs, color) => 
+        highestRankFor.set(color, d3.max(cs, d => d.rank)))
+
+    data.forEach(card => {
+      if (card.location[0] === 'table') {
+        if (card.rank == highestRankFor.get(card.color))  {
+          card.stackIndex = 0
+        } else {
+          card.stackIndex = -1 
+        }
+      }
+    })
+
     //let handLocations = d3.set(data.filter(d => d.location[0] === 'hand'), d => d.location.join('-')).values()
     let handLocations = ['hand-Jared', 'hand-Xavier']
     let discardCards = data
       .filter(d => d.location[0] === 'discard')
       .sort((x, y) => d3.ascending(x.rank, y.rank))
-      .map((c, i) => Object.assign({}, c, {index: i}))
+      .map((c, i) => Object.assign({}, c, {index: i, stackIndex: i}))
 
     let cardsInDeck = data.filter(d => d.location[0] === 'deck').length
     data.push({id: 'deck-marker', location: ['deck']})
@@ -196,7 +212,7 @@ class Board extends Component {
       .range([discardMarginY, discardMarginY + cardHeight])
 
     let t = d3.select(node).transition()
-      .duration(10000)
+      .duration(2000)
 
     let xFor = d => {
       switch (d.location[0]) {
@@ -217,6 +233,29 @@ class Board extends Component {
       }
     }
 
+    let translate3d = (x, y, z) => "translate3d(" + [x,y,z].join(',') + ")"
+    let deg = n => n + "deg"
+
+    let calculateTransform = d => {
+      let x = xFor(d)
+      let y = yFor(d)
+      let z = d.stackIndex || 0
+
+      let rx = 0
+      //let ry = 0
+      //let rz = 0
+
+      if (isFlipped(d)) {
+        y = y - cardHeight
+        rx = -180
+      }
+
+      return [
+        translate3d(px(x), px(y), px(z)),
+        "rotateX(" + deg(rx) + ")"
+      ].join(' ')
+    }
+
     let previousData = this.previousData
 
     d3.select(node)
@@ -229,8 +268,6 @@ class Board extends Component {
             enter => {
               enter.append('div')
                 .attr('class', 'card--container')
-                .style('left', d => px(xFor(d)))
-                .style('top', d => px(yFor(d)))
                 .call(container => {
                   container.append('div')
                     .attr('class', 'face card--back')
@@ -238,7 +275,7 @@ class Board extends Component {
                     .attr('class', 'face card--front')
                     .each(createCardFront)
                 })
-                .each(flipCard)
+                .style('transform', calculateTransform)
             },
             update => {
               let delayCounter = 0
@@ -265,45 +302,44 @@ class Board extends Component {
 
                     if (lastX !== nowX || lastY !== nowY || lastFlipped !== nowFlipped) {
                       cardNode
-                        .style('left', d => px(xFor(prev)))
-                        .style('top', d => px(yFor(prev)))
                         .transition(t)
                           .delay((d, i) => delayCounter * 100)
-                          .style('left', d => px(xFor(d)))
-                          .style('top', d => px(yFor(d)))
                           .styleTween('transform', function() {
-                            if (lastFlipped && !nowFlipped) {
-                              // Flip from back to front
-                              return function(t) {
-                                let zHeight = 50
-                                let z = (Math.pow(0.5, 2) - Math.pow(t - 0.5, 2)) * 4 * zHeight
-                                return "" +
-                                  "translateZ(" + z + "px) " +
+                            return function(t) {
+                              // TODO: Figure out good way to DRY up with
+                              // calculateTransform
+                              // Base transformation
+                              let x = lastX + (nowX - lastX) * t
+                              let y = lastY + (nowY - lastY) * t
+                              let zHeight = 40
+                              let z = (Math.pow(0.5, 2) - Math.pow(t - 0.5, 2)) * 4 * zHeight
+
+                              if (t >= 1.0) {
+                                z += d.stackIndex || 0
+                              }
+
+                              let ret = translate3d(px(x), px(y), px(z))
+
+                              if (lastFlipped && !nowFlipped) {
+                                // Flip from back to front
+                                return ret +
                                   "translateY(" + (-100 + t * 100) + "%) " +
                                   "rotateX(" + (-180 + t * 180) + "deg)"
+                              } else if (!lastFlipped && nowFlipped) {
+                                return ret +
+                                  "translateY(" + (t * -100) + "%) " +
+                                  "rotateX(" + (t * -180) + "deg)"
                               }
-                            } else if (!lastFlipped && nowFlipped) {
-                              console.log("UNIMPLEMENTED: Flipping card face down")
-                            } else if (prev.location !== d.location) {
-                              // No flip, just animate Z
-                              return function(t) {
-                                let zHeight = 50
-                                let z = (Math.pow(0.5, 2) - Math.pow(t - 0.5, 2)) * 4 * zHeight
-                                return "" +
-                                  "translateZ(" + z + "px) "
-                              }
+                              return ret
                             }
                           })
                       delayCounter += 1
                     }
                   } else {
                     cardNode
-                      .style('left', d => px(xFor(d)))
-                      .style('top', d => px(yFor(d)))
+                      .style('transform', calculateTransform)
                   }
                 })
-
-              // If card is flipping (compared to previous), flip it
             }
           )
         })
