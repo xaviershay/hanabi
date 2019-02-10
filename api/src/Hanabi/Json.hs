@@ -30,11 +30,15 @@ instance ToJSON RedactedCard where
     , "location" .= view redactedLocation card
     , "color"    .= view redactedColor card
     , "rank"     .= view redactedRank card
+    , "possibleRanks" .= view redactedPossibleRanks card
+    , "possibleColors" .= view redactedPossibleColors card
     ]
 
 instance ToJSON RedactedGame where
   toJSON (RedactedGame pid game) = object
     [ "version"      .= view gameVersion game
+    , "hints"        .= view gameHints game
+    , "explosions"   .= view gameExplosions game
     , "lastModified" .= view gameModified game
     , "cards"        .= (redact pid . M.elems . view gameCards $ game)
     ]
