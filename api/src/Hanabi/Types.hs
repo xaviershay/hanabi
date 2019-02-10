@@ -5,6 +5,7 @@ module Hanabi.Types where
 
 import GHC.Generics
 
+import Hanabi.Prelude
 import Control.Lens hiding (Choice)
 import Data.Aeson
 import qualified Data.List
@@ -37,6 +38,7 @@ data PlayerChoice =
   ChoicePlayCard CardId
   | ChoiceHintRank PlayerId Rank
   | ChoiceHintColor PlayerId Color
+  | ChoiceDiscardCard CardId
   deriving (Show)
 
 data Choice = Choice PlayerId PlayerChoice deriving (Show)
@@ -48,6 +50,7 @@ data Game = Game
   , _gameModified :: UTCTime
   , _gameCards :: CardMap
   , _gameHints :: Integer
+  , _gameMaxHints :: Integer
   , _gameExplosions :: Integer
   }
 
@@ -67,11 +70,12 @@ makeLenses ''RedactedCard
 mkGame :: UTCTime -> Game
 mkGame now = Game
   { _gameVersion = 1
-  , _gameHints = 5
+  , _gameHints = 2
+  , _gameMaxHints = 3
   , _gameExplosions = 3
   , _gameModified = now
   , _gameCards = M.fromList
-    [ (CardId 1, set cardId (CardId 1) $ mkFakeCard)
+    [ (CardId 1, set cardId (CardId 1) $ set cardLocation Discard mkFakeCard)
     , (CardId 2, set cardId (CardId 2) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
   --  , (CardId 3, set cardId (CardId 3) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
   --  , (CardId 4, set cardColor Yellow $ set cardId (CardId 4) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
@@ -81,7 +85,7 @@ mkGame now = Game
 
 mkFakeCard = Card
   { _cardId = CardId 1
-  , _cardLocation = Deck
+  , _cardLocation = Discard
   , _cardRank = 2
   , _cardColor = Red
   , _cardPossibleRanks = S.fromList allRanks
@@ -138,6 +142,33 @@ apply (Choice pid (ChoicePlayCard cid)) state =
               $ state
         _ -> state
     Nothing -> state
+
+apply (Choice pid (ChoiceDiscardCard cid)) state
+  | view gameHints state < view gameMaxHints state =
+    let maybeCard = view (gameCards . at cid) state in
+
+    case maybeCard of
+      Just chosenCard ->
+        let maybeTopCard = 
+              headMaybe
+                . filter
+                  (\card ->
+                    (view cardLocation card == Deck))
+                . M.elems
+                . view gameCards
+              $ state
+        in
+
+        let drawF = case maybeTopCard of
+                      Just topCard -> set (gameCards . at (view cardId topCard) . _Just . cardLocation) (Hand pid)
+                      Nothing -> id in
+
+        over gameHints (\x -> x + 1)
+          . set (gameCards . at cid . _Just . cardLocation) Discard
+          . drawF
+          $ state
+
+      Nothing -> state
 
 apply (Choice pid (ChoiceHintRank targetPid rank)) state
   | pid /= targetPid && view gameHints state > 0 =

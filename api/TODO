@@ -1,0 +1,15 @@
+* [DONE] Model attributes as sets
+* More actions? Get to "playable in theory"
+  * [DONE] Clue tokens
+  * [DONE] Explosion tokens
+  * [DONE] Discard a card
+
+* How to win/lose?
+* How to provide feedback on invalid choices?
+
+* Get rid of CardMap?
+* Rethink redactedCard/card split
+  * Rethink Maybe Color etc
+
+* API endpoint to provide a choice
+  * Play a game with curl
