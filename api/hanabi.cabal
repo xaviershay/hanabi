@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b2c07a5096500e64f268f31cb11d476c1ce67611aefd0f67b3bc1ab91acd553f
+-- hash: f1c77b8b9a9434cc026aaae1f7115d0ec4604b69281dfe37f8a60b8269cd61d3
 
 name:           hanabi
 version:        0.1.0.0
@@ -24,6 +24,10 @@ library
   exposed-modules:
       Hanabi
       Hanabi.Api
+      Hanabi.Extras.RFC1123
+      Hanabi.Extras.STM
+      Hanabi.Json
+      Hanabi.Prelude
       Hanabi.Types
   other-modules:
       Paths_hanabi
