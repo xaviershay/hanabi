@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Hanabi.Types where
 
@@ -7,6 +8,8 @@ import Hanabi.Prelude
 
 import Control.Lens hiding (Choice)
 import Control.Monad (unless, when)
+import Control.Monad.State
+import Control.Monad.Except
 import Data.Aeson
 import qualified Data.HashMap.Strict as M
 import Data.Hashable
@@ -116,98 +119,112 @@ redact pid = map (redactCard pid)
                (Just $ view cardRank card)
                (Just $ view cardColor card)
 
-
 applyWithInvalid :: Choice -> Game -> Either String Game
 applyWithInvalid (Choice pid playerChoice) state = do
   unless (pid == view gameCurrentPlayer state) $
     Left $ "cannot make a choice when not your turn"
   
-  case playerChoice of
-    ChoicePlayCard cid           -> applyPlay cid state
-    ChoiceDiscardCard cid        -> applyDiscard cid state
-    ChoiceHintRank target rank   -> applyHintRank target rank state
-    ChoiceHintColor target color -> applyHintColor target color state
+  runApp state $
+    case playerChoice of
+      ChoicePlayCard cid -> applyPlay cid
+
+      ChoiceDiscardCard cid        -> applyDiscard cid
+      ChoiceHintRank target rank   -> applyHintRank target rank
+      ChoiceHintColor target color -> applyHintColor target color
+
+runApp state m =
+  let (val, newGame) = runMonadStack m state in
+
+  val >>= \_ -> Right newGame
+
+  where
+    runMonadStack m state = runIdentity $ runStateT (runExceptT m) state
+
+type App a = (ExceptT String (StateT Game Identity)) a
+
+requireCard2 :: CardId -> App Card
+requireCard2 cid =
+  get >>= note "Card does not exist" . view (gameCards . at cid)
 
 requireCard :: CardId -> Game -> Either String Card
 requireCard cid = note "Card does not exist" . view (gameCards . at cid)
 
-applyPlay cid state = do
-  let maybeCard = view (gameCards . at cid) state
+applyPlay :: CardId -> App ()
+applyPlay cid = do
+  chosenCard <- requireCard2 cid
 
-  chosenCard <- requireCard cid state
+  maxRankOnTable <-
+    maximum
+    . (:) 0
+    . map (view cardRank)
+    . filter
+      (\card ->
+        (view cardLocation card == Table)
+        && view cardColor chosenCard == view cardColor card)
+    . M.elems
+    . view gameCards
+    <$> get
 
-  let maxRankOnTable =
-        maximum
-        . (:) 0
-        . map (view cardRank)
-        . filter
-          (\card ->
-            (view cardLocation card == Table)
-            && view cardColor chosenCard == view cardColor card)
-        . M.elems
-        . view gameCards
-        $ state
+  validateInHand chosenCard
 
-  -- TODO: Possible refactoring?
-  validateInHand chosenCard state
-
-  Right $
-    if view cardRank chosenCard == maxRankOnTable + 1 then
-      set (gameCards . at cid . _Just . cardLocation) Table state
-    else
-      set (gameCards . at cid . _Just . cardLocation) Discard
-        . over gameExplosions (\x -> x - 1)
-        $ state
+  if view cardRank chosenCard == maxRankOnTable + 1 then
+    assign (gameCards . at cid . _Just . cardLocation) Table
+  else
+    do
+      assign (gameCards . at cid . _Just . cardLocation) Discard
+      modifying gameExplosions (\x -> x - 1)
 
   where
-    validateInHand :: Card -> Game -> Either String Card
-    validateInHand card state =
-      let currentPlayerId = view gameCurrentPlayer state in
+    validateInHand :: Card -> App Card
+    validateInHand card = do
+      currentPlayerId <- view gameCurrentPlayer <$> get
+
       case view cardLocation card of
-        Hand cardPlayerId | cardPlayerId == currentPlayerId -> Right card
-        _ -> Left "card is not in hand"
+        Hand cardPlayerId | cardPlayerId == currentPlayerId -> return card
+        _ -> throwError "card is not in hand"
 
+applyDiscard :: CardId -> App ()
+applyDiscard cid = do
+  state <- get
 
-applyDiscard cid state = do
   unless (view gameHints state < view gameMaxHints state) $
-    Left "cannot discard when at max hints"
+    throwError "cannot discard when at max hints"
 
-  chosenCard <- requireCard cid state
+  chosenCard <- requireCard2 cid
 
-  let currentPlayerId = view gameCurrentPlayer state
+  currentPlayerId <- view gameCurrentPlayer <$> get
 
-  let maybeTopCard = 
-        headMaybe
-          . filter (\card -> (view cardLocation card == Deck))
-          . M.elems
-          . view gameCards
-        $ state
+  modifying gameHints (\x -> x + 1)
+  assign (gameCards . at cid . _Just . cardLocation) Discard
 
-  -- Only draw if there are cards left in the deck
-  let drawF =
-        maybe id
-          (\topCard ->
-            set
-              (gameCards . at (view cardId topCard) . _Just . cardLocation)
-              (Hand currentPlayerId))
-          maybeTopCard
+  maybeTopCard <-
+    headMaybe
+      . filter (\card -> (view cardLocation card == Deck))
+      . M.elems
+      . view gameCards
+    <$> get
 
-  Right $ over gameHints (\x -> x + 1)
-    . set (gameCards . at cid . _Just . cardLocation) Discard
-    . drawF
-    $ state
+  whenJust maybeTopCard $ \topCard ->
+    -- Only draw if there are cards left in the deck
+    assign
+      (gameCards . at (view cardId topCard) . _Just . cardLocation)
+      (Hand currentPlayerId)
 
+applyHintRank :: PlayerId -> Rank -> App ()
 applyHintRank  = applyHint cardRank cardPossibleRanks
+
+applyHintColor :: PlayerId -> Color -> App ()
 applyHintColor = applyHint cardColor cardPossibleColors
 
-applyHint accessor possibleAccessor targetPid hint state = do
-  let currentPlayerId = view gameCurrentPlayer state
+applyHint accessor possibleAccessor targetPid hint = do
+  state <- get
+  currentPlayerId <- view gameCurrentPlayer <$> get
 
   when (currentPlayerId == targetPid) $
-    Left "cannot hint self"
+    throwError "cannot hint self"
 
   unless (view gameHints state > 0) $
-    Left "insufficient hints remaining"
+    throwError "insufficient hints remaining"
 
   let handCards =
         filter (\card -> view cardLocation card == Hand targetPid)
@@ -217,21 +234,14 @@ applyHint accessor possibleAccessor targetPid hint state = do
   let (matchedCs, unmatchedCs) = Data.List.partition ((==) hint . view accessor) handCards
 
   unless (length matchedCs > 0) $
-    Left "can only hint ranks in hand"
+    throwError "can only hint ranks in hand"
 
-  -- TODO: Consider replacing foldr with more composable function
-  -- TODO: Figure out which strict fold to use
-  let cardAccessor = \card -> gameCards . at (view cardId card) . _Just . possibleAccessor
-  let state1 = foldr
-        (\card -> set (cardAccessor card) (S.singleton hint))
-        state
-        matchedCs
+  let cardAccessor =
+    \card -> gameCards . at (view cardId card) . _Just . possibleAccessor
 
-  let state2 = foldr
-        (\card -> over (cardAccessor card) (S.delete hint))
-        state1
-        unmatchedCs
+  forM_ matchedCs   $ \card -> assign    (cardAccessor card) (S.singleton hint)
+  forM_ unmatchedCs $ \card -> modifying (cardAccessor card) (S.delete hint)
 
-  Right $ over gameHints (\x -> x - 1) state2
+  modifying gameHints (\x -> x - 1)
 
 instance Hashable CardId
