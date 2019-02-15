@@ -237,7 +237,7 @@ applyHint accessor possibleAccessor targetPid hint = do
     throwError "can only hint ranks in hand"
 
   let cardAccessor =
-    \card -> gameCards . at (view cardId card) . _Just . possibleAccessor
+        \card -> gameCards . at (view cardId card) . _Just . possibleAccessor
 
   forM_ matchedCs   $ \card -> assign    (cardAccessor card) (S.singleton hint)
   forM_ unmatchedCs $ \card -> modifying (cardAccessor card) (S.delete hint)

@@ -6,7 +6,7 @@
 
 * How to win/lose?
 * [DONE] How to provide feedback on invalid choices?
-* Look a refactoring repetition of pid/state
+* [DONE] Look a refactoring repetition of pid/state
 
 * Get rid of CardMap?
 * Rethink redactedCard/card split
