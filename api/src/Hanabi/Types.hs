@@ -3,16 +3,17 @@
 
 module Hanabi.Types where
 
-import GHC.Generics
-
 import Hanabi.Prelude
+
 import Control.Lens hiding (Choice)
+import Control.Monad (unless, when)
 import Data.Aeson
-import qualified Data.List
-import Data.Time.Clock (UTCTime)
 import qualified Data.HashMap.Strict as M
-import qualified Data.Set as S
 import Data.Hashable
+import qualified Data.List
+import qualified Data.Set as S
+import Data.Time.Clock (UTCTime)
+import GHC.Generics
 
 data RedactedGame = RedactedGame PlayerId Game
 
@@ -52,6 +53,7 @@ data Game = Game
   , _gameHints :: Integer
   , _gameMaxHints :: Integer
   , _gameExplosions :: Integer
+  , _gameCurrentPlayer :: PlayerId
   }
 
 data RedactedCard = RedactedCard
@@ -74,6 +76,7 @@ mkGame now = Game
   , _gameMaxHints = 3
   , _gameExplosions = 3
   , _gameModified = now
+  , _gameCurrentPlayer = PlayerId "Xavier"
   , _gameCards = M.fromList
     [ (CardId 1, set cardId (CardId 1) $ set cardLocation Discard mkFakeCard)
     , (CardId 2, set cardId (CardId 2) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
@@ -113,118 +116,122 @@ redact pid = map (redactCard pid)
                (Just $ view cardRank card)
                (Just $ view cardColor card)
 
-apply :: Choice -> Game -> Game
-apply (Choice pid (ChoicePlayCard cid)) state =
-  let maybeCard = view (gameCards . at cid) state in
 
-  case maybeCard of
-    Just chosenCard ->
-      let maxRankOnTable =
-            maximum
-            . (:) 0
-            . map (view cardRank)
-            . filter
-              (\card ->
-                (view cardLocation card == Table)
-                && view cardColor chosenCard == view cardColor card)
-            . M.elems
-            . view gameCards
-            $ state
-            in
+applyWithInvalid :: Choice -> Game -> Either String Game
+applyWithInvalid (Choice pid playerChoice) state = do
+  unless (pid == view gameCurrentPlayer state) $
+    Left $ "cannot make a choice when not your turn"
+  
+  case playerChoice of
+    ChoicePlayCard cid           -> applyPlay cid state
+    ChoiceDiscardCard cid        -> applyDiscard cid state
+    ChoiceHintRank target rank   -> applyHintRank target rank state
+    ChoiceHintColor target color -> applyHintColor target color state
 
-      case view cardLocation chosenCard of
-        Hand cardPlayerId ->
-          if cardPlayerId == pid && view cardRank chosenCard == maxRankOnTable + 1 then
-            set (gameCards . at cid . _Just . cardLocation) Table state
-          else
-            set (gameCards . at cid . _Just . cardLocation) Discard
-              . over gameExplosions (\x -> x - 1)
-              $ state
-        _ -> state
-    Nothing -> state
+requireCard :: CardId -> Game -> Either String Card
+requireCard cid = note "Card does not exist" . view (gameCards . at cid)
 
-apply (Choice pid (ChoiceDiscardCard cid)) state
-  | view gameHints state < view gameMaxHints state =
-    let maybeCard = view (gameCards . at cid) state in
+applyPlay cid state = do
+  let maybeCard = view (gameCards . at cid) state
 
-    case maybeCard of
-      Just chosenCard ->
-        let maybeTopCard = 
-              headMaybe
-                . filter
-                  (\card ->
-                    (view cardLocation card == Deck))
-                . M.elems
-                . view gameCards
-              $ state
-        in
+  chosenCard <- requireCard cid state
 
-        let drawF = case maybeTopCard of
-                      Just topCard -> set (gameCards . at (view cardId topCard) . _Just . cardLocation) (Hand pid)
-                      Nothing -> id in
+  let maxRankOnTable =
+        maximum
+        . (:) 0
+        . map (view cardRank)
+        . filter
+          (\card ->
+            (view cardLocation card == Table)
+            && view cardColor chosenCard == view cardColor card)
+        . M.elems
+        . view gameCards
+        $ state
 
-        over gameHints (\x -> x + 1)
-          . set (gameCards . at cid . _Just . cardLocation) Discard
-          . drawF
-          $ state
+  -- TODO: Possible refactoring?
+  validateInHand chosenCard state
 
-      Nothing -> state
-
-apply (Choice pid (ChoiceHintRank targetPid rank)) state
-  | pid /= targetPid && view gameHints state > 0 =
-    let handCards =
-          filter (\card -> view cardLocation card == Hand targetPid)
-          . M.elems
-          $ view gameCards state in
-
-    let (matchedCs, unmatchedCs) = Data.List.partition ((==) rank . view cardRank) handCards in
-
-    if length matchedCs > 0 then
-      -- TODO: Consider replacing foldr with more composable function
-      -- TODO: Figure out which strict fold to use
-      let cardAccessor = \card -> gameCards . at (view cardId card) . _Just . cardPossibleRanks in
-      let state1 = foldr
-            (\card -> set (cardAccessor card) (S.singleton rank))
-            state
-            matchedCs in
-
-      let state2 = foldr
-            (\card -> over (cardAccessor card) (S.delete rank))
-            state1
-            unmatchedCs in
-
-      over gameHints (\x -> x - 1) state2
+  Right $
+    if view cardRank chosenCard == maxRankOnTable + 1 then
+      set (gameCards . at cid . _Just . cardLocation) Table state
     else
-      state
+      set (gameCards . at cid . _Just . cardLocation) Discard
+        . over gameExplosions (\x -> x - 1)
+        $ state
 
-apply (Choice pid (ChoiceHintColor targetPid color)) state
-  | pid /= targetPid && view gameHints state > 0 =
-    let handCards =
-          filter (\card -> view cardLocation card == Hand targetPid)
+  where
+    validateInHand :: Card -> Game -> Either String Card
+    validateInHand card state =
+      let currentPlayerId = view gameCurrentPlayer state in
+      case view cardLocation card of
+        Hand cardPlayerId | cardPlayerId == currentPlayerId -> Right card
+        _ -> Left "card is not in hand"
+
+
+applyDiscard cid state = do
+  unless (view gameHints state < view gameMaxHints state) $
+    Left "cannot discard when at max hints"
+
+  chosenCard <- requireCard cid state
+
+  let currentPlayerId = view gameCurrentPlayer state
+
+  let maybeTopCard = 
+        headMaybe
+          . filter (\card -> (view cardLocation card == Deck))
           . M.elems
-          $ view gameCards state in
+          . view gameCards
+        $ state
 
-    let (matchedCs, unmatchedCs) = Data.List.partition ((==) color . view cardColor) handCards in
+  -- Only draw if there are cards left in the deck
+  let drawF =
+        maybe id
+          (\topCard ->
+            set
+              (gameCards . at (view cardId topCard) . _Just . cardLocation)
+              (Hand currentPlayerId))
+          maybeTopCard
 
-    if length matchedCs > 0 then
-      -- TODO: Consider replacing foldr with more composable function
-      -- TODO: Figure out which strict fold to use
-      let cardAccessor = \card -> gameCards . at (view cardId card) . _Just . cardPossibleColors in
-      let state1 = foldr
-            (\card -> set (cardAccessor card) (S.singleton color))
-            state
-            matchedCs in
+  Right $ over gameHints (\x -> x + 1)
+    . set (gameCards . at cid . _Just . cardLocation) Discard
+    . drawF
+    $ state
 
-      let state2 = foldr
-            (\card -> over (cardAccessor card) (S.delete color))
-            state1
-            unmatchedCs in
+applyHintRank  = applyHint cardRank cardPossibleRanks
+applyHintColor = applyHint cardColor cardPossibleColors
 
-      over gameHints (\x -> x - 1) state2
-    else
-      state
+applyHint accessor possibleAccessor targetPid hint state = do
+  let currentPlayerId = view gameCurrentPlayer state
 
-apply _ _ = error "unimplemented"
+  when (currentPlayerId == targetPid) $
+    Left "cannot hint self"
 
+  unless (view gameHints state > 0) $
+    Left "insufficient hints remaining"
+
+  let handCards =
+        filter (\card -> view cardLocation card == Hand targetPid)
+        . M.elems
+        $ view gameCards state
+
+  let (matchedCs, unmatchedCs) = Data.List.partition ((==) hint . view accessor) handCards
+
+  unless (length matchedCs > 0) $
+    Left "can only hint ranks in hand"
+
+  -- TODO: Consider replacing foldr with more composable function
+  -- TODO: Figure out which strict fold to use
+  let cardAccessor = \card -> gameCards . at (view cardId card) . _Just . possibleAccessor
+  let state1 = foldr
+        (\card -> set (cardAccessor card) (S.singleton hint))
+        state
+        matchedCs
+
+  let state2 = foldr
+        (\card -> over (cardAccessor card) (S.delete hint))
+        state1
+        unmatchedCs
+
+  Right $ over gameHints (\x -> x - 1) state2
 
 instance Hashable CardId

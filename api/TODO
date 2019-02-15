@@ -5,7 +5,8 @@
   * [DONE] Discard a card
 
 * How to win/lose?
-* How to provide feedback on invalid choices?
+* [DONE] How to provide feedback on invalid choices?
+* Look a refactoring repetition of pid/state
 
 * Get rid of CardMap?
 * Rethink redactedCard/card split
