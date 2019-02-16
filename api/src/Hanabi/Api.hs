@@ -38,8 +38,21 @@ newtype State = State
 
 type AppM = ReaderT State Handler
 type MyAPI =
-  "_status" :> Get '[JSON] ()
-  :<|> "games" :> Capture "id" Int :> QueryParam "version" Integer :> Get '[JSON] (Headers '[LastModifiedHeader] RedactedGame)
+  "_status"
+    :> Get '[JSON] ()
+  :<|> "games"
+    :> Capture "id" Int
+    :> QueryParam' '[Required] "as" PlayerId
+    :> QueryParam "version" Integer
+    :> Get '[JSON] (Headers '[LastModifiedHeader] RedactedGame)
+  :<|> "games"
+    :> Capture "id" Int
+    :> QueryParam' '[Required] "as" PlayerId
+    :> ReqBody '[JSON] PlayerChoice
+    :> Post '[JSON] ()
+
+instance FromHttpApiData PlayerId where
+  parseQueryParam x = PlayerId <$> parseQueryParam x
 
 mkState :: IO State
 mkState = do
@@ -66,13 +79,13 @@ app s =   logStdoutDev
                    { corsRequestHeaders = [ "authorization", "content-type" ]
                    }
 
-server = getStatus :<|> getGame
+server = getStatus :<|> getGame :<|> postChoice
 
 getStatus :: AppM ()
 getStatus = return ()
 
-getGame :: Int -> Maybe Integer -> AppM (Headers '[LastModifiedHeader] RedactedGame)
-getGame gameId maybeVersion = do
+getGame :: Int -> PlayerId -> Maybe Integer -> AppM (Headers '[LastModifiedHeader] RedactedGame)
+getGame gameId requestingPlayer maybeVersion = do
   let currentVersion = fromMaybe 0 maybeVersion
 
   gvar <- findGame gameId
@@ -85,7 +98,11 @@ getGame gameId maybeVersion = do
   -- TODO: Identify the calling player and appropriately redact.
   return
     . addHeader (RFC1123Time . view gameModified $ g)
-    $ RedactedGame (PlayerId "Xavier") g
+    $ RedactedGame requestingPlayer g
+
+postChoice :: Int -> PlayerId -> PlayerChoice -> AppM ()
+postChoice gameId choosingPlayer choice = do
+  return ()
 
 findGame :: Int -> AppM (TVar Game)
 findGame gameId = do
