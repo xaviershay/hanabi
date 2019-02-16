@@ -52,6 +52,11 @@ data Choice = Choice PlayerId PlayerChoice deriving (Show)
 
 type CardMap = M.HashMap CardId Card
 
+data GameSpec = GameSpec
+  { _gameSpecPlayers :: [PlayerId]
+  } deriving (Show, Generic)
+
+
 data Game = Game
   { _gameVersion :: Integer
   , _gameModified :: UTCTime

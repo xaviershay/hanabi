@@ -42,6 +42,9 @@ type MyAPI =
   "_status"
     :> Get '[JSON] ()
   :<|> "games"
+    :> ReqBody '[JSON] GameSpec
+    :> Post '[JSON] Int
+  :<|> "games"
     :> Capture "id" Int
     :> QueryParam' '[Required] "as" PlayerId
     :> QueryParam "version" Integer
@@ -80,10 +83,22 @@ app s =   logStdoutDev
                    { corsRequestHeaders = [ "authorization", "content-type" ]
                    }
 
-server = getStatus :<|> getGame :<|> postChoice
+server = getStatus :<|> postGame :<|> getGame :<|> postChoice
 
 getStatus :: AppM ()
 getStatus = return ()
+
+postGame :: GameSpec -> AppM Int
+postGame spec = do
+  s@State{games = stateVar} <- ask
+  gameMap <- liftIO . atomically . readTVar $ stateVar
+
+  let newId = maximum (0:M.keys gameMap) + 1
+
+  now  <- liftIO getCurrentTime
+  liftIO $ addGame s newId (mkGame now)
+
+  return newId
 
 getGame :: Int -> PlayerId -> Maybe Integer -> AppM (Headers '[LastModifiedHeader] RedactedGame)
 getGame gameId requestingPlayer maybeVersion = do
@@ -96,7 +111,6 @@ getGame gameId requestingPlayer maybeVersion = do
                   (TimeoutSecs 30)
                 >>= maybe (atomically . readTVar $ gvar) return
 
-  -- TODO: Identify the calling player and appropriately redact.
   return
     . addHeader (RFC1123Time . view gameModified $ g)
     $ RedactedGame requestingPlayer g

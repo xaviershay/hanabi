@@ -67,5 +67,11 @@ instance FromJSON PlayerChoice where
       "hintColor" -> ChoiceHintColor   <$> v .: "player" <*> v .: "color"
       _           -> fail "unknown choice"
 
+instance FromJSON GameSpec where
+  parseJSON = withObject "GameSpec" $ \v -> do
+    players <- v .: "players"
+
+    return $ GameSpec { _gameSpecPlayers = players }
+
 instance FromJSON PlayerId
 instance FromJSON CardId
