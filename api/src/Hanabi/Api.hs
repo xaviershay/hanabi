@@ -23,9 +23,10 @@ import           Control.Monad.STM                    (atomically, check, orElse
 import           Control.Concurrent                   (forkIO)
 import           Control.Lens                         (over, view, set)
 import           Control.Concurrent.STM.TVar          (TVar, modifyTVar,
-                                                       newTVar, readTVar, registerDelay)
+                                                       newTVar, readTVar, registerDelay, writeTVar)
 import           Control.Monad.IO.Class               (liftIO)
 import Data.Time.Clock (UTCTime, getCurrentTime)
+import qualified Data.ByteString.Lazy.Char8 as BSL
 
 import Hanabi.Extras.RFC1123 (RFC1123Time(..))
 import Hanabi.Extras.STM (readTVarWhen, Timeout(..))
@@ -102,7 +103,26 @@ getGame gameId requestingPlayer maybeVersion = do
 
 postChoice :: Int -> PlayerId -> PlayerChoice -> AppM ()
 postChoice gameId choosingPlayer choice = do
-  return ()
+  gvar <- findGame gameId
+
+  result <- liftIO $ do
+    now  <- getCurrentTime
+
+    atomically $ do
+      state <- readTVar gvar
+
+      case applyWithInvalid (Choice choosingPlayer choice) state of
+        Right newGame -> do
+          writeTVar gvar
+            . over gameVersion (+ 1)
+            . set gameModified now
+            $ newGame
+          return (Right ())
+        Left err -> return (Left err)
+
+  case result of
+    Right () -> return ()
+    Left err -> throwError err400 { errBody  = BSL.pack err }
 
 findGame :: Int -> AppM (TVar Game)
 findGame gameId = do
