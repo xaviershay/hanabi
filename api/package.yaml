@@ -33,7 +33,6 @@ library:
     - unordered-containers
     - containers
     - hashable
-    - mtl
     - lens
     - random
     - wai-cors
@@ -41,6 +40,7 @@ library:
     - parsec
     - pretty-show
     - time
+    - freer-simple
 
 executables:
   hanabi-exe:
@@ -82,4 +82,3 @@ tests:
     - unordered-containers
     - text
     - hashable
-    - mtl
