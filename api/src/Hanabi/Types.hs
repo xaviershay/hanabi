@@ -1,15 +1,19 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Hanabi.Types where
 
 import Hanabi.Prelude
 
-import Control.Lens hiding (Choice)
-import Control.Monad (unless, when)
-import Control.Monad.State
-import Control.Monad.Except
+import Control.Monad.Freer (Eff, Members, run, runM)
+import Control.Monad.Freer.Error (Error, throwError, runError)
+import Control.Monad.Freer.State (State(..), get, gets, put, runState)
+import Control.Lens (view, makeLenses, _Just, at)
+import Control.Monad (unless, when, forM_)
 import Data.Aeson
 import qualified Data.HashMap.Strict as M
 import Data.Hashable
@@ -25,7 +29,7 @@ newtype CardId = CardId Int deriving (Show, Eq, Generic)
 type Rank = Int
 
 data Color = Red | Blue | Green | Yellow | White deriving (Show, Enum, Generic, Bounded, Ord, Eq)
-data Location = Hand PlayerId | Deck | Table | Discard deriving (Show, Generic, Eq) 
+data Location = Hand PlayerId | Deck | Table | Discard deriving (Show, Generic, Eq)
 allColors = [minBound :: Color .. ]
 allRanks = [1..5]
 
@@ -119,42 +123,35 @@ redact pid = map (redactCard pid)
                (Just $ view cardRank card)
                (Just $ view cardColor card)
 
+type AppEff effs = Members '[ Error String, State Game ] effs
+
+runApp :: Game -> Eff '[ Error String, State Game ] a -> Either String Game
+runApp state m =
+  let (val, newGame) = run . runState state . runError $ m in
+
+  val >>= \_ -> Right newGame
+
 applyWithInvalid :: Choice -> Game -> Either String Game
 applyWithInvalid (Choice pid playerChoice) state = do
   unless (pid == view gameCurrentPlayer state) $
     Left $ "cannot make a choice when not your turn"
-  
-  runApp state $
-    case playerChoice of
-      ChoicePlayCard cid -> applyPlay cid
 
-      ChoiceDiscardCard cid        -> applyDiscard cid
-      ChoiceHintRank target rank   -> applyHintRank target rank
-      ChoiceHintColor target color -> applyHintColor target color
+  runApp state $ case playerChoice of
+    ChoicePlayCard cid           -> applyPlay cid
+    ChoiceDiscardCard cid        -> applyDiscard cid
+    ChoiceHintRank target rank   -> applyHintRank target rank
+    ChoiceHintColor target color -> applyHintColor target color
 
-runApp state m =
-  let (val, newGame) = runMonadStack m state in
-
-  val >>= \_ -> Right newGame
-
-  where
-    runMonadStack m state = runIdentity $ runStateT (runExceptT m) state
-
-type App a = (ExceptT String (StateT Game Identity)) a
-
-requireCard2 :: CardId -> App Card
-requireCard2 cid =
+requireCard :: AppEff effs => CardId -> Eff effs Card
+requireCard cid =
   get >>= note "Card does not exist" . view (gameCards . at cid)
 
-requireCard :: CardId -> Game -> Either String Card
-requireCard cid = note "Card does not exist" . view (gameCards . at cid)
-
-applyPlay :: CardId -> App ()
+applyPlay :: AppEff effs => CardId -> Eff effs ()
 applyPlay cid = do
-  chosenCard <- requireCard2 cid
+  chosenCard <- requireCard cid
 
   maxRankOnTable <-
-    maximum
+    gets $ maximum
     . (:) 0
     . map (view cardRank)
     . filter
@@ -163,7 +160,6 @@ applyPlay cid = do
         && view cardColor chosenCard == view cardColor card)
     . M.elems
     . view gameCards
-    <$> get
 
   validateInHand chosenCard
 
@@ -175,34 +171,33 @@ applyPlay cid = do
       modifying gameExplosions (\x -> x - 1)
 
   where
-    validateInHand :: Card -> App Card
+    validateInHand :: AppEff effs => Card -> Eff effs ()
     validateInHand card = do
       currentPlayerId <- view gameCurrentPlayer <$> get
 
       case view cardLocation card of
-        Hand cardPlayerId | cardPlayerId == currentPlayerId -> return card
+        Hand cardPlayerId | cardPlayerId == currentPlayerId -> return ()
         _ -> throwError "card is not in hand"
 
-applyDiscard :: CardId -> App ()
+applyDiscard :: AppEff effs => CardId -> Eff effs ()
 applyDiscard cid = do
   state <- get
 
   unless (view gameHints state < view gameMaxHints state) $
     throwError "cannot discard when at max hints"
 
-  chosenCard <- requireCard2 cid
+  chosenCard <- requireCard cid
 
-  currentPlayerId <- view gameCurrentPlayer <$> get
+  currentPlayerId <- gets $ view gameCurrentPlayer
 
   modifying gameHints (\x -> x + 1)
   assign (gameCards . at cid . _Just . cardLocation) Discard
 
-  maybeTopCard <-
+  maybeTopCard <- gets $
     headMaybe
       . filter (\card -> (view cardLocation card == Deck))
       . M.elems
       . view gameCards
-    <$> get
 
   whenJust maybeTopCard $ \topCard ->
     -- Only draw if there are cards left in the deck
@@ -210,15 +205,15 @@ applyDiscard cid = do
       (gameCards . at (view cardId topCard) . _Just . cardLocation)
       (Hand currentPlayerId)
 
-applyHintRank :: PlayerId -> Rank -> App ()
+applyHintRank :: AppEff effs => PlayerId -> Rank -> Eff effs ()
 applyHintRank  = applyHint cardRank cardPossibleRanks
 
-applyHintColor :: PlayerId -> Color -> App ()
+applyHintColor :: AppEff effs => PlayerId -> Color -> Eff effs ()
 applyHintColor = applyHint cardColor cardPossibleColors
 
 applyHint accessor possibleAccessor targetPid hint = do
   state <- get
-  currentPlayerId <- view gameCurrentPlayer <$> get
+  currentPlayerId <- gets $ view gameCurrentPlayer
 
   when (currentPlayerId == targetPid) $
     throwError "cannot hint self"

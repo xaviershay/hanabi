@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f1c77b8b9a9434cc026aaae1f7115d0ec4604b69281dfe37f8a60b8269cd61d3
+-- hash: bce144dab6375d1d04290976e15748d51ec1268788c29d6f3bd0db4b088eafa7
 
 name:           hanabi
 version:        0.1.0.0
@@ -38,9 +38,9 @@ library
     , base >=4.7 && <5
     , bytestring
     , containers
+    , freer-simple
     , hashable
     , lens
-    , mtl
     , parsec
     , pretty-show
     , random
@@ -87,7 +87,6 @@ test-suite hanabi-test
     , hanabi
     , hashable
     , lens
-    , mtl
     , random
     , random-shuffle
     , tasty
