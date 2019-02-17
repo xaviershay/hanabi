@@ -23,9 +23,10 @@ import           Control.Monad.STM                    (atomically, check, orElse
 import           Control.Concurrent                   (forkIO)
 import           Control.Lens                         (over, view, set)
 import           Control.Concurrent.STM.TVar          (TVar, modifyTVar,
-                                                       newTVar, readTVar, registerDelay)
+                                                       newTVar, readTVar, registerDelay, writeTVar)
 import           Control.Monad.IO.Class               (liftIO)
 import Data.Time.Clock (UTCTime, getCurrentTime)
+import qualified Data.ByteString.Lazy.Char8 as BSL
 
 import Hanabi.Extras.RFC1123 (RFC1123Time(..))
 import Hanabi.Extras.STM (readTVarWhen, Timeout(..))
@@ -38,8 +39,24 @@ newtype State = State
 
 type AppM = ReaderT State Handler
 type MyAPI =
-  "_status" :> Get '[JSON] ()
-  :<|> "games" :> Capture "id" Int :> QueryParam "version" Integer :> Get '[JSON] (Headers '[LastModifiedHeader] RedactedGame)
+  "_status"
+    :> Get '[JSON] ()
+  :<|> "games"
+    :> ReqBody '[JSON] GameSpec
+    :> Post '[JSON] Int
+  :<|> "games"
+    :> Capture "id" Int
+    :> QueryParam' '[Required] "as" PlayerId
+    :> QueryParam "version" Integer
+    :> Get '[JSON] (Headers '[LastModifiedHeader] RedactedGame)
+  :<|> "games"
+    :> Capture "id" Int
+    :> QueryParam' '[Required] "as" PlayerId
+    :> ReqBody '[JSON] PlayerChoice
+    :> Post '[JSON] ()
+
+instance FromHttpApiData PlayerId where
+  parseQueryParam x = PlayerId <$> parseQueryParam x
 
 mkState :: IO State
 mkState = do
@@ -66,13 +83,25 @@ app s =   logStdoutDev
                    { corsRequestHeaders = [ "authorization", "content-type" ]
                    }
 
-server = getStatus :<|> getGame
+server = getStatus :<|> postGame :<|> getGame :<|> postChoice
 
 getStatus :: AppM ()
 getStatus = return ()
 
-getGame :: Int -> Maybe Integer -> AppM (Headers '[LastModifiedHeader] RedactedGame)
-getGame gameId maybeVersion = do
+postGame :: GameSpec -> AppM Int
+postGame spec = do
+  s@State{games = stateVar} <- ask
+  gameMap <- liftIO . atomically . readTVar $ stateVar
+
+  let newId = maximum (0:M.keys gameMap) + 1
+
+  now  <- liftIO getCurrentTime
+  liftIO $ addGame s newId (mkGame now)
+
+  return newId
+
+getGame :: Int -> PlayerId -> Maybe Integer -> AppM (Headers '[LastModifiedHeader] RedactedGame)
+getGame gameId requestingPlayer maybeVersion = do
   let currentVersion = fromMaybe 0 maybeVersion
 
   gvar <- findGame gameId
@@ -82,10 +111,32 @@ getGame gameId maybeVersion = do
                   (TimeoutSecs 30)
                 >>= maybe (atomically . readTVar $ gvar) return
 
-  -- TODO: Identify the calling player and appropriately redact.
   return
     . addHeader (RFC1123Time . view gameModified $ g)
-    $ RedactedGame (PlayerId "Xavier") g
+    $ RedactedGame requestingPlayer g
+
+postChoice :: Int -> PlayerId -> PlayerChoice -> AppM ()
+postChoice gameId choosingPlayer choice = do
+  gvar <- findGame gameId
+
+  result <- liftIO $ do
+    now  <- getCurrentTime
+
+    atomically $ do
+      state <- readTVar gvar
+
+      case applyWithInvalid (Choice choosingPlayer choice) state of
+        Right newGame -> do
+          writeTVar gvar
+            . over gameVersion (+ 1)
+            . set gameModified now
+            $ newGame
+          return (Right ())
+        Left err -> return (Left err)
+
+  case result of
+    Right () -> return ()
+    Left err -> throwError err400 { errBody  = BSL.pack err }
 
 findGame :: Int -> AppM (TVar Game)
 findGame gameId = do

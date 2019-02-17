@@ -14,7 +14,6 @@ import Control.Monad.Freer.Error (Error, throwError, runError)
 import Control.Monad.Freer.State (State(..), get, gets, put, runState)
 import Control.Lens (view, makeLenses, _Just, at)
 import Control.Monad (unless, when, forM_)
-import Data.Aeson
 import qualified Data.HashMap.Strict as M
 import Data.Hashable
 import qualified Data.List
@@ -52,6 +51,11 @@ data PlayerChoice =
 data Choice = Choice PlayerId PlayerChoice deriving (Show)
 
 type CardMap = M.HashMap CardId Card
+
+data GameSpec = GameSpec
+  { _gameSpecPlayers :: [PlayerId]
+  } deriving (Show, Generic)
+
 
 data Game = Game
   { _gameVersion :: Integer
