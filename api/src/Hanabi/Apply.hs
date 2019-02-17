@@ -5,7 +5,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Hanabi.Apply
-  ( applyWithInvalid
+  ( apply
   ) where
 
 import Hanabi.Prelude
@@ -32,8 +32,8 @@ runApp state m =
 
   val >>= \_ -> Right newGame
 
-applyWithInvalid :: Choice -> Game -> Either String Game
-applyWithInvalid (Choice pid playerChoice) state = do
+apply :: Choice -> Game -> Either String Game
+apply (Choice pid playerChoice) state = do
   unless (pid == view gameCurrentPlayer state) $
     Left $ "cannot make a choice when not your turn"
 

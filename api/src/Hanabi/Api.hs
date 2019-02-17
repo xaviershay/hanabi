@@ -126,7 +126,7 @@ postChoice gameId choosingPlayer choice = do
     atomically $ do
       state <- readTVar gvar
 
-      case applyWithInvalid (Choice choosingPlayer choice) state of
+      case apply (Choice choosingPlayer choice) state of
         Right newGame -> do
           writeTVar gvar
             . over gameVersion (+ 1)

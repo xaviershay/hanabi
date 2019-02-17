@@ -1,7 +1,7 @@
 module Hanabi
   ( mkState
   , app
-  , applyWithInvalid
+  , apply
   ) where
 
 import Hanabi.Types
