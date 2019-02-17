@@ -4,10 +4,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DerivingVia #-}
 
 module Hanabi.Types where
 
 import Hanabi.Prelude
+import Hanabi.Extras.Aeson
 
 import Control.Monad.Freer (Eff, Members, run, runM)
 import Control.Monad.Freer.Error (Error, throwError, runError)
@@ -16,6 +18,7 @@ import Control.Lens (view, makeLenses, _Just, at)
 import Control.Monad (unless, when, forM_)
 import qualified Data.HashMap.Strict as M
 import Data.Hashable
+import Data.Aeson
 import qualified Data.List
 import qualified Data.Set as S
 import Data.Time.Clock (UTCTime)
@@ -23,8 +26,15 @@ import GHC.Generics
 
 data RedactedGame = RedactedGame PlayerId Game
 
-newtype PlayerId = PlayerId String deriving (Show, Eq, Generic)
-newtype CardId = CardId Int deriving (Show, Eq, Generic)
+newtype PlayerId = PlayerId String
+  deriving stock (Show, Eq, Generic)
+  deriving FromJSON via String
+
+newtype CardId = CardId Int
+  deriving stock (Show, Eq, Generic)
+  deriving ToJSON via Int
+  deriving FromJSON via Int
+
 type Rank = Int
 
 data Color = Red | Blue | Green | Yellow | White deriving (Show, Enum, Generic, Bounded, Ord, Eq)
@@ -54,7 +64,9 @@ type CardMap = M.HashMap CardId Card
 
 data GameSpec = GameSpec
   { _gameSpecPlayers :: [PlayerId]
-  } deriving (Show, Generic)
+  }
+  deriving stock (Show, Generic)
+  deriving FromJSON via StripPrefix "_gameSpec" GameSpec
 
 
 data Game = Game
