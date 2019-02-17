@@ -38,7 +38,11 @@ newtype CardId = CardId Int
 
 type Rank = Int
 
-data Color = Red | Blue | Green | Yellow | White deriving (Show, Enum, Generic, Bounded, Ord, Eq)
+data Color = Red | Blue | Green | Yellow | White
+  deriving stock (Show, Enum, Generic, Bounded, Ord, Eq)
+  deriving ToJSON via LowercaseShow Color
+  deriving FromJSON via LowercaseShow Color
+
 data Location = Hand PlayerId | Deck | Table | Discard deriving (Show, Generic, Eq)
 allColors = [minBound :: Color .. ]
 allRanks = [1..5]
@@ -68,7 +72,6 @@ data GameSpec = GameSpec
   }
   deriving stock (Show, Generic)
   deriving FromJSON via StripPrefix "_gameSpec" GameSpec
-
 
 data Game = Game
   { _gameVersion :: Integer

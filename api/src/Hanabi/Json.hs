@@ -11,13 +11,6 @@ import Data.Aeson
 import qualified Data.HashMap.Strict as M
 import qualified Data.Text as T
 
-instance ToJSON Color where
-  toJSON Red    = "red"
-  toJSON Green  = "green"
-  toJSON White  = "white"
-  toJSON Blue   = "blue"
-  toJSON Yellow = "yellow"
-
 instance ToJSON Location where
   toJSON = toJSON . toList
     where
@@ -47,13 +40,6 @@ instance ToJSON RedactedGame where
     , "lastModified" .= view gameModified game
     , "cards"        .= (redact pid . M.elems . view gameCards $ game)
     ]
-
-instance FromJSON Color where
-  parseJSON = withText "Color" $
-    \case
-      "red"   -> pure Red
-      "green" -> pure Green
-      _ -> fail "unknown color"
 
 instance FromJSON PlayerChoice where
   parseJSON = withObject "PlayerChoice" $ \v -> do
