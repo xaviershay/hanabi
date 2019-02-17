@@ -1,39 +1,42 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Hanabi.Types where
 
-import Hanabi.Prelude
-import Hanabi.Extras.Aeson
+import           Hanabi.Extras.Aeson
+import           Hanabi.Prelude
 
-import Control.Monad.Freer (Eff, Members, run, runM)
-import Control.Monad.Freer.Error (Error, throwError, runError)
-import Control.Monad.Freer.State (State(..), get, gets, put, runState)
-import Control.Lens (view, makeLenses, _Just, at)
-import Control.Monad (unless, when, forM_)
-import qualified Data.HashMap.Strict as M
-import Data.Hashable
-import Data.Aeson
+import           Control.Lens              (at, makeLenses, view, _Just)
+import           Control.Monad             (forM_, unless, when)
+import           Control.Monad.Freer       (Eff, Members, run, runM)
+import           Control.Monad.Freer.Error (Error, runError, throwError)
+import           Control.Monad.Freer.State (State (..), get, gets, put,
+                                            runState)
+import           Data.Aeson
+import           Data.Hashable
+import qualified Data.HashMap.Strict       as M
 import qualified Data.List
-import qualified Data.Set as S
-import Data.Time.Clock (UTCTime)
-import GHC.Generics
-
-data RedactedGame = RedactedGame PlayerId Game
+import qualified Data.Set                  as S
+import qualified Data.Text                 as T
+import           Data.Time.Clock           (UTCTime)
+import           GHC.Generics
 
 newtype PlayerId = PlayerId String
   deriving stock (Show, Eq, Generic)
+  deriving ToJSON via String
   deriving FromJSON via String
 
 newtype CardId = CardId Int
   deriving stock (Show, Eq, Generic)
   deriving ToJSON via Int
   deriving FromJSON via Int
+  deriving ToJSONKey via Int
   deriving Hashable via Int
 
 type Rank = Int
@@ -44,6 +47,15 @@ data Color = Red | Blue | Green | Yellow | White
   deriving FromJSON via LowercaseShow Color
 
 data Location = Hand PlayerId | Deck | Table | Discard deriving (Show, Generic, Eq)
+
+instance ToJSON Location where
+  toJSON = toJSON . toList
+    where
+      toList (Hand (PlayerId pid)) = ["hand", pid]
+      toList Deck = ["deck"]
+      toList Discard = ["discard"]
+      toList Table = ["table"]
+
 allColors = [minBound :: Color .. ]
 allRanks = [1..5]
 
@@ -54,7 +66,9 @@ data Card = Card
   , _cardLocation :: Location
   , _cardPossibleRanks :: S.Set Rank
   , _cardPossibleColors :: S.Set Color
-  } deriving (Show, Generic)
+  }
+  deriving stock (Show, Generic)
+  deriving ToJSON via StripPrefix "_card" Card
 
 data PlayerChoice =
   ChoicePlayCard CardId
@@ -64,6 +78,16 @@ data PlayerChoice =
   deriving (Show)
 
 data Choice = Choice PlayerId PlayerChoice deriving (Show)
+
+instance FromJSON PlayerChoice where
+  parseJSON = withObject "PlayerChoice" $ \v -> do
+    action :: T.Text <- v .: "type"
+    case action of
+      "play"      -> ChoicePlayCard    <$> v .: "id"
+      "discard"   -> ChoiceDiscardCard <$> v .: "id"
+      "hintRank"  -> ChoiceHintRank    <$> v .: "player" <*> v .: "rank"
+      "hintColor" -> ChoiceHintColor   <$> v .: "player" <*> v .: "color"
+      _           -> fail "unknown choice"
 
 type CardMap = M.HashMap CardId Card
 
@@ -82,15 +106,32 @@ data Game = Game
   , _gameExplosions :: Integer
   , _gameCurrentPlayer :: PlayerId
   }
+  deriving stock (Generic)
 
 data RedactedCard = RedactedCard
-  { _redactedCardId :: CardId
+  { _redactedId :: CardId
   , _redactedLocation :: Location
   , _redactedColor :: Maybe Color
   , _redactedRank :: Maybe Rank
   , _redactedPossibleRanks :: S.Set Rank
   , _redactedPossibleColors :: S.Set Color
   }
+  deriving stock (Generic)
+
+instance ToJSON RedactedCard where
+  toJSON card =
+    let
+      (Object base) = toJSON
+        (StripPrefix card :: StripPrefix "_redacted" RedactedCard)
+      -- Just to cut down on noise, remove possible* keys when card is not in
+      -- hand.
+      f = case _redactedLocation card of
+            Hand _ -> id
+            _      -> M.delete "possibleRanks" . M.delete "possibleColors"
+
+    in
+
+    toJSON $ f base
 
 makeLenses ''Game
 makeLenses ''Card
@@ -124,13 +165,26 @@ mkFakeCard = Card
 
 mkRedactedCard :: Card -> Maybe Rank -> Maybe Color -> RedactedCard
 mkRedactedCard base rank color = RedactedCard
-  { _redactedCardId = view cardId base
+  { _redactedId = view cardId base
   , _redactedLocation = view cardLocation base
   , _redactedRank = rank
   , _redactedColor = color
   , _redactedPossibleRanks = view cardPossibleRanks base
   , _redactedPossibleColors = view cardPossibleColors base
   }
+
+data RedactedGame = RedactedGame PlayerId Game
+
+instance ToJSON RedactedGame where
+  toJSON (RedactedGame pid game) =
+    let
+      (Object base) = toJSON (StripPrefix game :: StripPrefix "_game" Game)
+      (Object redacted) = object
+          [ "cards" .= toJSON (redact pid . M.elems . view gameCards $ game)
+          ]
+    in
+
+    toJSON $ redacted <> base
 
 redact :: PlayerId -> [Card] -> [RedactedCard]
 redact pid = map (redactCard pid)

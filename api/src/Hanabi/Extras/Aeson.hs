@@ -39,6 +39,9 @@ instance (Show a, Enum a, Bounded a) => FromJSON (LowercaseShow a) where
 newtype StripPrefix (s :: Symbol) a =
   StripPrefix a
 
+lowercaseFirst (x:xs) = toLower x:xs
+lowercaseFirst [] = []
+
 instance ( Generic a
          , GFromJSON Zero (Rep a)
          , KnownSymbol s )
@@ -46,4 +49,14 @@ instance ( Generic a
   {-# INLINE parseJSON #-}
   parseJSON = fmap StripPrefix . genericParseJSON options
     where options = defaultOptions { fieldLabelModifier = drop' }
-          drop'   = fromMaybe <*> stripPrefix (symbolVal (Proxy @s))
+          drop'   = lowercaseFirst
+                      . (fromMaybe <*> stripPrefix (symbolVal (Proxy @s)))
+
+instance ( Generic a
+         , GToJSON Zero (Rep a)
+         , KnownSymbol s )
+      => ToJSON (StripPrefix s a) where
+  toJSON (StripPrefix x) = genericToJSON options x
+    where options = defaultOptions { fieldLabelModifier = drop' }
+          drop'   = lowercaseFirst
+                      . (fromMaybe <*> stripPrefix (symbolVal (Proxy @s)))

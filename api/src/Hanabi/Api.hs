@@ -8,7 +8,6 @@ module Hanabi.Api
   ) where
 
 import Hanabi.Types
-import Hanabi.Json
 import Hanabi.Apply
 
 import           Network.Wai.Middleware.Cors          (cors, corsRequestHeaders,
