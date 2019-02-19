@@ -8,7 +8,7 @@ module Hanabi.Api
   ) where
 
 import Hanabi.Types
-import Hanabi.Json
+import Hanabi.Apply
 
 import           Network.Wai.Middleware.Cors          (cors, corsRequestHeaders,
                                                        simpleCorsResourcePolicy)
@@ -125,7 +125,7 @@ postChoice gameId choosingPlayer choice = do
     atomically $ do
       state <- readTVar gvar
 
-      case applyWithInvalid (Choice choosingPlayer choice) state of
+      case apply (Choice choosingPlayer choice) state of
         Right newGame -> do
           writeTVar gvar
             . over gameVersion (+ 1)
