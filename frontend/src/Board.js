@@ -122,8 +122,8 @@ class Board extends Component {
 
     let highestRankFor = new Map()
     d3array
-      .group(data.filter(c => c.location[0] == 'table'), d => d.color)
-      .forEach((cs, color) => 
+      .group(data.filter(c => c.location[0] === 'table'), d => d.color)
+      .forEach((cs, color) =>
         highestRankFor.set(color, d3.max(cs, d => d.rank)))
 
     data.forEach(card => {
@@ -131,7 +131,7 @@ class Board extends Component {
         if (card.rank === highestRankFor.get(card.color))  {
           card.stackIndex = 0
         } else {
-          card.stackIndex = -1 
+          card.stackIndex = -1
         }
       }
     })

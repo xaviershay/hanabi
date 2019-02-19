@@ -25,6 +25,8 @@ import qualified Data.List
 import qualified Data.Set                  as S
 import qualified Data.Text                 as T
 import           Data.Time.Clock           (UTCTime)
+import           System.Random             (StdGen)
+import           System.Random.Shuffle     (shuffle')
 import           GHC.Generics
 
 newtype PlayerId = PlayerId String
@@ -137,21 +139,56 @@ makeLenses ''Game
 makeLenses ''Card
 makeLenses ''RedactedCard
 
-mkGame :: UTCTime -> Game
-mkGame now = Game
+mkGame :: StdGen -> UTCTime -> Game
+mkGame rng now = Game
   { _gameVersion = 1
   , _gameHints = 2
   , _gameMaxHints = 3
   , _gameExplosions = 3
   , _gameModified = now
-  , _gameCurrentPlayer = PlayerId "Xavier"
+  , _gameCurrentPlayer = PlayerId ""
   , _gameCards = M.fromList
-    [ (CardId 1, set cardId (CardId 1) $ set cardLocation Discard mkFakeCard)
-    , (CardId 2, set cardId (CardId 2) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
-  --  , (CardId 3, set cardId (CardId 3) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
-  --  , (CardId 4, set cardColor Yellow $ set cardId (CardId 4) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
-  --  , (CardId 5, set cardRank 3 $ set cardId (CardId 5) $ set cardLocation (Hand (PlayerId "Xavier")) mkFakeCard)
-    ] --mempty
+                   . map (\((color, rank), id) -> (CardId id, mkCard color rank (CardId id)))
+                   -- This shuffle doesn't really guarantee us much since we're
+                   -- shoving into a map with undefined ordering properties,
+                   -- but at least it gets us "random-ish" for now.
+                   $ zip (shuffle' allCards (length allCards) rng) [1..]
+  }
+
+setupGame players game = foldl dealHand game players
+  where
+    dealHand game pid =
+      let
+        hand = take 5
+          . filter ((==) Deck . view cardLocation)
+          . M.elems
+          . view gameCards $ game
+      in
+
+      foldl (drawCard pid) (set gameCurrentPlayer (head players) game) hand
+
+    drawCard pid game card =
+      set (gameCards . at (view cardId card) . _Just . cardLocation) (Hand pid) game
+
+
+
+allCards = concat [replicate f (c, n) | c <- allColors, (n, f) <- frequencies]
+
+frequencies =
+  [ (1, 3)
+  , (2, 2)
+  , (3, 2)
+  , (4, 2)
+  , (5, 1)
+  ]
+
+mkCard color rank id = Card
+  { _cardId = id
+  , _cardLocation = Deck
+  , _cardRank = rank
+  , _cardColor = color
+  , _cardPossibleRanks = S.fromList allRanks
+  , _cardPossibleColors = S.fromList allColors
   }
 
 mkFakeCard = Card
