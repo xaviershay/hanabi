@@ -41,6 +41,7 @@ library:
     - pretty-show
     - time
     - freer-simple
+    - random-shuffle
 
 executables:
   hanabi-exe:

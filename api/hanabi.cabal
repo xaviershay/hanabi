@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ee391e2174d4d823e455b8879f4391aba408f9d304a0caba33e73c9d8a1d0aeb
+-- hash: d4d3be15dc11ed94fe1115406f7726ad5287f4aa58b953dd6a5fbc32b8a0da35
 
 name:           hanabi
 version:        0.1.0.0
@@ -45,6 +45,7 @@ library
     , parsec
     , pretty-show
     , random
+    , random-shuffle
     , servant-server
     , stm
     , text

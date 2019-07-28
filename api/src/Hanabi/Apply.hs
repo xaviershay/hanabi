@@ -71,15 +71,6 @@ applyPlay cid = do
       assign (gameCards . at cid . _Just . cardLocation) Discard
       modifying gameExplosions (\x -> x - 1)
 
-  where
-    validateInHand :: AppEff effs => Card -> Eff effs ()
-    validateInHand card = do
-      currentPlayerId <- view gameCurrentPlayer <$> get
-
-      case view cardLocation card of
-        Hand cardPlayerId | cardPlayerId == currentPlayerId -> return ()
-        _ -> throwError "card is not in hand"
-
 applyDiscard :: AppEff effs => CardId -> Eff effs ()
 applyDiscard cid = do
   state <- get
@@ -88,6 +79,8 @@ applyDiscard cid = do
     throwError "cannot discard when at max hints"
 
   chosenCard <- requireCard cid
+
+  validateInHand chosenCard
 
   currentPlayerId <- gets $ view gameCurrentPlayer
 
@@ -139,3 +132,12 @@ applyHint accessor possibleAccessor targetPid hint = do
   forM_ unmatchedCs $ \card -> modifying (cardAccessor card) (S.delete hint)
 
   modifying gameHints (\x -> x - 1)
+
+validateInHand :: AppEff effs => Card -> Eff effs ()
+validateInHand card = do
+  currentPlayerId <- view gameCurrentPlayer <$> get
+
+  case view cardLocation card of
+    Hand cardPlayerId | cardPlayerId == currentPlayerId -> return ()
+    _ -> throwError "card is not in hand"
+

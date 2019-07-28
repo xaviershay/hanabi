@@ -27,6 +27,7 @@ import           Control.Concurrent.STM.TVar          (TVar, modifyTVar,
 import           Control.Monad.IO.Class               (liftIO)
 import Data.Time.Clock (UTCTime, getCurrentTime)
 import qualified Data.ByteString.Lazy.Char8 as BSL
+import System.Random (newStdGen)
 
 import Hanabi.Extras.RFC1123 (RFC1123Time(..))
 import Hanabi.Extras.STM (readTVarWhen, Timeout(..))
@@ -61,9 +62,10 @@ instance FromHttpApiData PlayerId where
 mkState :: IO State
 mkState = do
   now  <- liftIO getCurrentTime
+  rng  <- liftIO newStdGen
   x    <- atomically . newTVar $ mempty
   let s = State { games = x }
-  addGame s 1 (mkGame now)
+  addGame s 1 (setupGame [PlayerId "Xavier", PlayerId "Jared"] $ mkGame rng now)
   return s
 
 
@@ -95,8 +97,10 @@ postGame spec = do
 
   let newId = maximum (0:M.keys gameMap) + 1
 
-  now  <- liftIO getCurrentTime
-  liftIO $ addGame s newId (mkGame now)
+  liftIO $ do
+    now <- getCurrentTime
+    rng <- newStdGen
+    addGame s newId (mkGame rng now)
 
   return newId
 

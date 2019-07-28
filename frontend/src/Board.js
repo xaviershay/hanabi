@@ -2,6 +2,9 @@ import React, { Component } from 'react'
 import * as d3array from 'd3-array'
 import * as d3 from 'd3'
 
+let allColors = ['red', 'green', 'yellow', 'blue', 'white']
+let allRanks = [1,2,3,4,5]
+
 function px(n) {
   return n + "px"
 }
@@ -21,7 +24,7 @@ function makeRange(n) {
 }
 
 function isFlipped(d) {
-  return d.rank === undefined
+  return d.rank === null || !(d.rank >= 0)
 }
 
 function createNumberCardFront(front, d) {
@@ -89,6 +92,35 @@ function createCardFront(d) {
   }
 }
 
+function createCardBack(card) {
+  let face = d3.select(this)
+
+  if (card.possibleRanks && card.possibleColors) {
+    face
+      .append('div')
+      .attr('class', 'possible-colors')
+      .selectAll('i')
+        .data(allColors)
+        .join(
+          enter => enter.append('i')
+            .attr('class', d => iconFor(d))
+            .style('opacity', d => card.possibleColors.indexOf(d) >= 0 ? 0.8 : 0.3)
+        )
+
+    face
+      .append('div')
+      .attr('class', 'possible-ranks')
+      .selectAll('span')
+        .data(allRanks)
+        .join(
+          enter => enter.append('span')
+            .text(d => d)
+            .style('opacity', d => card.possibleRanks.indexOf(d) >= 0 ? 0.8 : 0.3)
+        )
+
+  }
+}
+
 class Board extends Component {
   constructor(props){
     super(props)
@@ -114,16 +146,14 @@ class Board extends Component {
       Array.from(d3array.group(rawData, d => d.location.join('-')).values())
         .flatMap(cs => cs.sort((x, y) => d3.ascending(x.rank, y.rank)).map((c, i) => Object.assign({}, c, {index: i})))
 
-    let allColors = ['red', 'green', 'yellow', 'blue', 'white']
-
     allColors.forEach(color => {
       data.push({id: '0-' + color, rank: 0, color: color, location: ['table']})
     })
 
     let highestRankFor = new Map()
     d3array
-      .group(data.filter(c => c.location[0] == 'table'), d => d.color)
-      .forEach((cs, color) => 
+      .group(data.filter(c => c.location[0] === 'table'), d => d.color)
+      .forEach((cs, color) =>
         highestRankFor.set(color, d3.max(cs, d => d.rank)))
 
     data.forEach(card => {
@@ -131,7 +161,7 @@ class Board extends Component {
         if (card.rank === highestRankFor.get(card.color))  {
           card.stackIndex = 0
         } else {
-          card.stackIndex = -1 
+          card.stackIndex = -1
         }
       }
     })
@@ -258,6 +288,7 @@ class Board extends Component {
                 .call(container => {
                   container.append('div')
                     .attr('class', 'face card--back')
+                    .each(createCardBack)
                   container.append('div')
                     .attr('class', 'face card--front')
                     .each(createCardFront)
